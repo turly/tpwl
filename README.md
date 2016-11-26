@@ -1,9 +1,11 @@
 # tpwl
 
 *tpwl* is turly's _Tiny Powerline_-style prompt for bash (only.)
-![Example](tpwl.jpg)
 
 Set `PS1` to the resulting string and you'll get a Powerline-style bash prompt.
+
+![Example](tpwl.jpg)
+
 
 tpwl is loosely based on the Python-based [powerline shell](https://github.com/banga/powerline-shell) 
 but was hacked together in C and implements _only_ the stuff that I use - no built-in version control info, etc.
