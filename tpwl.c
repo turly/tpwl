@@ -460,7 +460,7 @@ static void add_cwd (struct segs *s, const char *cwd, const char *homedir, int c
                 if (! entire_p && thislen > (max_dir_len+1))    /* +1 allows for  '/'  */
                     strcpy (tp + max_dir_len - si->ellipsis_width, si->ellipsis);
                 else
-                if (split_p && spaced_p)
+                if ((last_p || split_p) && spaced_p)
                     strcat (thisdir, " ");          /* Extra space for split component  */
 
                 if (twiddle_bodge_p)
