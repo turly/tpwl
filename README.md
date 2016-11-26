@@ -58,7 +58,9 @@ if [ "$TERM" != "linux" ]; then                         # not Linux console
             #branch_str=$'\xee\x82\xa0'                  # Powerline font's BRANCH glyph U+E0A0
             #branch_str="$branch_str "                   # space after
             PS1_NEEDS_UPDATE_P=0
-            PS1="$($TPWL $TPWL_ARGS --ssh-all --fgbg=240:123 $CC_VIEW_SPEC --fgbg=240:6 " $branch_str$PRUNED_CLEARCASE_BRANCH" --cwd-max-depth=-4 --cwd-max-dir-size=10 --pwd --title=^$CC_VIEW_SPEC)"
+            PS1="$($TPWL $TPWL_ARGS --ssh-all --fgbg=240:123 $CC_VIEW_SPEC -\
+                   -fgbg=240:6 " $branch_str$PRUNED_CLEARCASE_BRANCH" \
+                   --cwd-max-depth=-4 --cwd-max-dir-size=10 --pwd --title=^$CC_VIEW_SPEC)"
           fi
         }
     else                                                # no CC_VIEW_SPEC
