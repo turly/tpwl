@@ -1,9 +1,11 @@
 # tpwl
 
 *tpwl* is turly's _Tiny Powerline_-style prompt for bash (only.)
-![Example](tpwl.jpg)
 
 Set `PS1` to the resulting string and you'll get a Powerline-style bash prompt.
+
+![Example](tpwl.jpg)
+
 
 tpwl is loosely based on the Python-based [powerline shell](https://github.com/banga/powerline-shell) 
 but was hacked together in C and implements _only_ the stuff that I use - no built-in version control info, etc.
@@ -39,7 +41,7 @@ and note the changes in your prompt.  `tpwl --help` will show you all the option
 If you're happy with it, you could add something like this to your _.bashrc_:
 ```bash
 function _update_ps1() {
-    PS1="$($TPWL --history --ssh-all --cwd-max-depth=-4 --cwd-max-dir-size=10 --pwd --status=$? --title)"
+    PS1="$(tpwl --history --ssh-all --cwd-max-depth=-4 --cwd-max-dir-size=10 --pwd --status=$? --title)"
 }
 if [[ "$PROMPT_COMMAND" != *_update_ps1* ]]; then   # doesn't already contain _update_ps1
     PROMPT_COMMAND="_update_ps1; $PROMPT_COMMAND"
