@@ -1,11 +1,17 @@
 # tpwl
 
 *tpwl* is turly's _Tiny Powerline_-style prompt for bash (only.)
+
 Set PS1 to the resulting string and you'll get a Powerline-style bash prompt.
+
 tpwl is (very) loosely based on https://github.com/banga/powerline-shell but is hacked together in C and implements _only_ the stuff that I use - no built-in version control info, etc.
+
 For best results, install and use one of the [patched Powerline fonts](https://github.com/powerline/fonts) (I use Anonymice).
+
 _tpwl_ builds a string in the order given by its arguments.  Some arguments need to appear before others as they'll affect the appearance of the later args.
+
 _tpwl_ works around bash / readline UTF-8 bugs is prompt length calculation but this can be turned off.
+
 _tpwl_ allows arbitrary text (including UTF-8 characters) in arbitrary colors to be added to the prompt, see the excerpt from my _.bashrc_ below.
 
 ## Installation
@@ -67,9 +73,10 @@ if [ "$TERM" != "linux" ]; then                         # not Linux console
         PROMPT_COMMAND="_update_ps1; $PROMPT_COMMAND"
     fi
   fi                                                    # TPWL
-fi      # $TERM
+fi                                                      # $TERM
 ```
 The above sets up an `_update_ps1` function which calls _tpwl_ (with different parameters depending on if I'm in a Clearcase view.)  Note that it tries to cut down on the number of calls to _tpwl_ by having other code set the `PS1_NEEDS_UPDATE_P` shell variable - look at the `cd` function for example. 
+
 There is nothing stopping you from having an `_update_ps1` function that *always* calls _tpwl_ - the overhead of calling it is pretty small.
 
 ## Arguments
