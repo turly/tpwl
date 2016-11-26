@@ -1,10 +1,11 @@
 # tpwl
 
 *tpwl* is turly's _Tiny Powerline_-style prompt for bash (only.)
+![Example](tpwl.jpg)
 
 Set `PS1` to the resulting string and you'll get a Powerline-style bash prompt.
 
-tpwl is (very) loosely based on the Python-based [powerline shell](https://github.com/banga/powerline-shell) 
+tpwl is loosely based on the Python-based [powerline shell](https://github.com/banga/powerline-shell) 
 but was hacked together in C and implements _only_ the stuff that I use - no built-in version control info, etc.
 
 For best results, install and use one of the [patched Powerline fonts](https://github.com/powerline/fonts) (I use Anonymice).
@@ -20,7 +21,7 @@ _**tpwl**_:
 
 ## Installation
 Download tpwl.c and do
-```
+```bash
 cc -Wall -Wextra -Werror tpwl.c -o tpwl
 ```
 Put the binary somewhere reachable - mine's in /usr/local/bin/tpwl.
@@ -28,16 +29,33 @@ Put the binary somewhere reachable - mine's in /usr/local/bin/tpwl.
 ## Checking it works and experimenting with it
 
 In bash, type
-```
-PS1=$(tpwl --ssh-all --history --pwd --title)
+```bash
+PS1=$(tpwl --ssh-all --history --pwd --status=$? --title)
 ```
 and note the changes in your prompt.  `tpwl --help` will show you all the options.
 
 ## Usage
 
 If you're happy with it, you could add something like this to your _.bashrc_:
+```bash
+function _update_ps1() {
+    PS1="$($TPWL --history --ssh-all --cwd-max-depth=-4 --cwd-max-dir-size=10 --pwd --status=$? --title)"
+}
+if [[ "$PROMPT_COMMAND" != *_update_ps1* ]]; then   # doesn't already contain _update_ps1
+    PROMPT_COMMAND="_update_ps1; $PROMPT_COMMAND"
 ```
-#!/bin/bash
+
+This will arrange for the bash function `_update_ps1` to be called every time bash outputs a prompt.
+`update_ps1` just calls sets `PS1` to whatever string is printed by the _tpwl_ invocation.
+
+Here's what's in my _.bashrc_, a bit more complicated as I have different 
+parameters depending on whether I'm in a Clearcase view, plus I don't want
+to call tpwl every time as it's on a network drive.  To this end it relies
+on other code setting the `PS1_NEEDS_UPDATE_P` shell variable
+- look at the `cd` function for example.  Note that because _tpwl_ is not
+called every time, I don't use the `--status=$?` arg.
+
+```bash
 
 function cd () {                    # This just sets PS1_NEEDS_UPDATE_P
     PS1_NEEDS_UPDATE_P=1
@@ -53,7 +71,7 @@ PS1="[\\W]\\! \\$ "                 # Simple prompt by default
 
 
 if [ "$TERM" != "linux" ]; then                         # not Linux console
-  TPWL="/usr/local/bin/tpwl"
+  TPWL="~/bin/$OSTYPE/tpwl"
   if [ -x "$TPWL" ]; then
     TPWL_ARGS="--history"                               # --tighten --plain
     if [ "$CLEARCASE_VIEW" != "" ]; then                # Special update_ps1 for Clearcase view
@@ -81,17 +99,6 @@ if [ "$TERM" != "linux" ]; then                         # not Linux console
   fi                                                    # TPWL
 fi                                                      # $TERM
 ```
-The above sets up an `_update_ps1` function which calls _tpwl_ (with 
-different parameters depending on if I'm in a Clearcase view.)
-Note that it tries to cut down on the number of calls to _tpwl_ by 
-having other code set the `PS1_NEEDS_UPDATE_P` shell variable 
-- look at the `cd` function for example. 
-
-There is nothing stopping you from having an `_update_ps1` function 
-that *always* calls _tpwl_ - the overhead of calling it is pretty small.
-Indeed if you want to use the `--status=$?` argument (which applies a 
-different color to the prompt if the last command failed), you _have_ 
-to call it every time.
 
 ## Arguments
 ```
