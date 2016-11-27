@@ -1,6 +1,7 @@
 # tpwl
 
-*tpwl* is turly's _Tiny Powerline_-style prompt for bash (only.)
+*tpwl* is turly's _Tiny Powerline_-style prompt for bash.
+It's fast, written in plain old C, and works well even on an old 133MHz Linux box. 
 
 Set `PS1` to the resulting string and you'll get a Powerline-style bash prompt.
 
@@ -54,49 +55,31 @@ if [[ "$PROMPT_COMMAND" != *_update_ps1* ]]; then   # doesn't already contain _u
 This will arrange for the bash function `_update_ps1` to be called every time bash outputs a prompt.
 `update_ps1` just sets `PS1` to whatever string is printed by the _tpwl_ invocation.
 
-Here's what's in my work _.bashrc_, a bit more complicated as I have different 
-parameters depending on whether I'm in a Clearcase view, plus I don't want
-to call _tpwl_ every time as it's likely on a network drive.  To this end it relies
-on other code setting the `PS1_NEEDS_UPDATE_P` shell variable - look at 
-the `cd` function for example.  Note that because _tpwl_ is _not_
-called every time, I don't use the `--status=$?` arg.
+Here's what's in my work _.bashrc_, slightly more complicated as I have different 
+parameters depending on whether I'm in a Clearcase view.
 
 ```bash
-
-function cd () {                    # This just sets PS1_NEEDS_UPDATE_P
-    PS1_NEEDS_UPDATE_P=1
-    builtin cd "$@"
-}
-
 function reset_ps1() {              # In case of screw-up - type reset_ps1
-    PS1_NEEDS_UPDATE_P=1
     PROMPT_COMMAND=""
     PS1="\\W \\! \\$ "              # Revert to simple prompt
 }
 PS1="[\\W]\\! \\$ "                 # Simple prompt by default
 
-
 if [ "$TERM" != "linux" ]; then                         # not Linux console
   TPWL="~/bin/$OSTYPE/tpwl"
   if [ -x "$TPWL" ]; then
-    TPWL_ARGS="--hist"                                  # --tight --plain
+    TPWL_ARGS="--hist --status=$?"                      # --tight --plain
     if [ "$CLEARCASE_VIEW" != "" ]; then                # Special update_ps1 for Clearcase view
         function _update_ps1() {
-          if [ $PS1_NEEDS_UPDATE_P -eq 1 ] ; then
             #branch_str=$'\xee\x82\xa0'                  # Powerline font's BRANCH glyph U+E0A0
             #branch_str="$branch_str "                   # space after
-            PS1_NEEDS_UPDATE_P=0
             PS1="$($TPWL $TPWL_ARGS --ssh-all --fb=240:123 $CLEARCASE_VIEW \
                    --fb=240:6 " $branch_str$CLEARCASE_BRANCH" \
                    --depth=-4 --dir-size=10 --pwd --title=^$CLEARCASE_VIEW)"
-          fi
         }
     else                                                # no CLEARCASE_VIEW
         function _update_ps1() {
-          if [ $PS1_NEEDS_UPDATE_P -eq 1 ] ; then
-            PS1_NEEDS_UPDATE_P=0
             PS1="$($TPWL $TPWL_ARGS --ssh-all --depth=-4 --dir-size=10 --pwd --title)"
-          fi
         }
     fi                                                  # CLEARCASE_VIEW
     if [[ "$PROMPT_COMMAND" != *_update_ps1* ]]; then   # doesn't already contain _update_ps1
@@ -143,5 +126,5 @@ See _tpwl_ project page at https://github.com/turly/tpwl
 
 # License
 
-_tpwl_ is MIT Licensed.  See the LICENSE file.
+_tpwl_ is (C) 2016 Turly O'Connor and is MIT Licensed.  See the LICENSE file.
 
