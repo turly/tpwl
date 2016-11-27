@@ -5,7 +5,7 @@ It's fast, written in plain old C, and works well even on an old 133MHz Linux bo
 
 Set `PS1` to the resulting string and you'll get a Powerline-style bash prompt.
 
-![Example](tpwl.jpg)
+![Example](example.jpg)
 
 
 tpwl is loosely based on the Python-based [powerline shell](https://github.com/banga/powerline-shell) 
@@ -25,7 +25,7 @@ _**tpwl**_:
 ## Installation
 Download tpwl.c and do
 ```bash
-cc -Wall -Wextra -Werror tpwl.c -o tpwl
+cc -O2 -Wall -Wextra -Werror tpwl.c -o tpwl
 ```
 Put the _tpwl_ binary somewhere on your PATH.
 
