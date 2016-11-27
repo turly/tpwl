@@ -1,10 +1,32 @@
 /* tpwl.c
 
    Turly's Tiny Powerline Shell for bash (ONLY) in straight C.
+   Project code available at https://github.com/turly/tpwl
+
    (Very) loosely based on https://github.com/banga/powerline-shell
    -- with NO version control stuff, just basic prompt management.
 
-   (C) 2016 Turly O'Connor.  No rights reserved, have at it :-)  */
+   MIT License
+
+    Copyright (c) 2016 turly o'connor
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.  */
 
 #include <stdio.h>
 #include <stdint.h>
@@ -14,7 +36,7 @@
 #include <assert.h>
 
 static void fatal (const char *fmt_str, ...) __attribute__ ((noreturn, format (printf, 1, 2)));
-static const char TPWL_VERSION [] = "0.1";
+static const char TPWL_VERSION [] = "0.2";
 
 /* By default, we say that bash/readline do NOT work properly with UTF-8.
    In that case we use some horrible bodgery to try to fix this - see
@@ -27,14 +49,14 @@ struct symbol_info_t {
     const char lock [4], network [4], sep [4], thin [4], ellipsis [4];
     int   ellipsis_width;                           /* In characters, not string bytes  */
 };
-enum symtype_t {SYM_COMPAT, SYM_ASCII = SYM_COMPAT, SYM_PATCHED, SYM_FLAT};
+enum symtype_t {SYM_ASCII, SYM_PATCHED, SYM_FLAT};
 static const struct symbol_info_t info_symbols [] = {
     {"RO", "SSH", ">", ">", "...", 3},
     {"\xEE\x82\xA2", "\xEE\x82\xA2", "\xee\x82\xb0", "\xee\x82\xb1", "\xE2\x80\xA6", 1},
     {"", "", "", "", "", 0}
 };
 
-enum color_indices {    // vaguely based on Python powerline-shell's DefaultColor
+enum color_indices {        /* vaguely based on Python powerline-shell's DefaultColor  */
     CI_NONE = 0,
     USERNAME_FG = 250,
     USERNAME_BG = 240,
@@ -43,14 +65,14 @@ enum color_indices {    // vaguely based on Python powerline-shell's DefaultColo
     HOSTNAME_FG = 250,
     HOSTNAME_BG = 238,
 
-    HOME_BG = 31,       // blueish
-    HOME_FG = 15,       // white
-    PATH_BG = 32,       // bluey
-    PATH_FG = 254,      // slightly-off white
-    CWD_FG  = 255,      // whiter white
+    HOME_BG = 31,           // blueish
+    HOME_FG = 15,           // white
+    PATH_BG = 32,           // bluey
+    PATH_FG = 254,          // slightly-off white
+    CWD_FG  = 255,          // whiter white
     SEPARATOR_FG = 250,
 
-    SSH_BG = 166,       // medium orange
+    SSH_BG = 166,           // medium orange
     SSH_FG = 254,
 
     CMD_PASSED_BG = 240,    // dark grey
@@ -60,8 +82,8 @@ enum color_indices {    // vaguely based on Python powerline-shell's DefaultColo
     CMD_FAILED_FG = 15,
 };
 
-static void append_fgcolor (char *buf, int code) { if (code != CI_NONE) sprintf (buf + strlen (buf), "\\e[38;5;%dm", code); }
-static void append_bgcolor (char *buf, int code) { if (code != CI_NONE) sprintf (buf + strlen (buf), "\\e[48;5;%dm", code); }
+static void append_fgcolor (char *b, int code) { if (code != CI_NONE) sprintf (b + strlen (b), "\\e[38;5;%dm", code); }
+static void append_bgcolor (char *b, int code) { if (code != CI_NONE) sprintf (b + strlen (b), "\\e[48;5;%dm", code); }
 
 static char             pline [8192];           /* "Big enough" (ahem) to avoid checks  */
 static enum symtype_t   symtyp = SYM_PATCHED;   /* Assume patched fonts available - use --compat otherwise  */
@@ -81,8 +103,8 @@ static struct segs {
 /* Returns the length of the UTF-8 character encoded at STR.
    Only one UTF-8 character beginning at STR is examined.
    Returns 0 if string is empty, or 1 if the first char of STR
-   is an ASCII char.  Else returns the length in bytes of the UTF-8
-   character at STR.  */
+   is an ASCII char (taken to be any nonzero value < 0x80).
+   Otherwise returns the length in bytes of the UTF-8 char at STR.  */
 
 static int get_char_len_utf8 (const char *str)
 {
@@ -92,6 +114,7 @@ static int get_char_len_utf8 (const char *str)
         return (fc) ? 1 : 0;    /* null char: return 0, otherwise it's ASCII  */
 
     const unsigned nc = * (uint8_t *) (str + 1);
+
     if (fc >= 0xC2 && fc <= 0xDF && nc >= 0x80 && nc <= 0xBF)
         return 2;
 
@@ -144,18 +167,18 @@ static int get_char_len_utf8 (const char *str)
    Grossly inefficient, be careful out there!
    XXX Maybe a better solution would be to use tput?  */
 
-static int strcpy_with_utf8_encoding (char *d, const char *str)
+static int strcpy_with_utf8_encoding (char *d, const char *s)
 {
     int last_was_esc_p = 0;
     int len;
 
     if (bash_handles_utf8_p)                    /* User has a bash/readline that groks UTF-8  */
     {
-        strcpy (d, str);
+        strcpy (d, s);
         return 0;
     }
 
-    while ((len = get_char_len_utf8 (str)) > 0) /* LEN normally 1 unless we're at a UTF-8 char  */
+    while ((len = get_char_len_utf8 (s)) > 0)   /* LEN normally 1 unless we're at a UTF-8 char  */
     {
         if (len > 1)                            /* UTF-8  */
         {   
@@ -164,13 +187,13 @@ static int strcpy_with_utf8_encoding (char *d, const char *str)
             *d++ = '\\'; 
             *d++ = '0'; *d++ = '1'; *d++ = '0'; /* ONE Octal BACKSPACE ^H 010  */
             while (len--)
-                *d++ = *str++;                  /* Copy UTF8 sequence  */
+                *d++ = *s++;                    /* Copy UTF8 sequence  */
             *d++ = '\\'; *d++ = ']';            /* Bash end sequence of nonprinting characters  */
             last_was_esc_p = 1;
         }
         else                                    /* ASCII  */
         {
-            *d++ = *str++;
+            *d++ = *s++;
             last_was_esc_p = 0;
         }
     }
@@ -324,18 +347,18 @@ static void add_user (struct segs *s, const char *user)
       cygdrive > c > Development > tpwl
    otherwise it's
       /cygdrive/c/Development/tpwl.
-   CWD_MAX_DEPTH is the max number of pathname component dirs to display
-                 - if negative, only lastmost dirs are displayed, otherwise
-                 we try to display first and last directory names.
-   MAX_DIR_LEN   is the max length of each individual pathname component and
-                 must be at least the width of the ellipsis
+   MAX_DEPTH    is the max number of pathname component dirs to display
+                - if negative, only lastmost dirs are displayed, otherwise
+                we try to display first and last directory names.
+   MAX_DIR_LEN  is the max length of each individual pathname component and
+                should be at least the width in chars of the ellipsis
    
    If SPLIT_P is zero, we sneakily say that if the length of CWD is less than
-   (cwd_max_depth * MAX_DIR_LEN) then we can display the entire path with no truncation
+   (max_depth * MAX_DIR_LEN) then we can display the entire path with no truncation
    even if individual directories are longer than MAX_DIR_LEN or the number
-   of directories exceeds cwd_max_depth.  */
+   of directories exceeds max_depth.  */
 
-static void add_cwd (struct segs *s, const char *cwd, const char *homedir, int cwd_max_depth, int max_dir_len, int split_p)
+static void add_cwd (struct segs *s, const char *cwd, const char *homedir, int max_depth, int max_dir_len, int split_p)
 {
     if (cwd == NULL || *cwd == 0)
         return;
@@ -359,10 +382,10 @@ static void add_cwd (struct segs *s, const char *cwd, const char *homedir, int c
         int         entire_p = 0;
         int         dir_missing_ellipsis_needed_p = 0;
         int         ix;
-        int         abs_max_depth = (cwd_max_depth < 0) ? - cwd_max_depth : cwd_max_depth;
+        int         abs_max_depth = (max_depth < 0) ? - max_depth : max_depth;
 
         /* FIXME this only works for ASCII pathnames  */
-        //fprintf (stderr, "CWD is '%s' (len %d), cwd_max_depth %d, max_dir_len %d\n", cwd, totlen, cwd_max_depth, max_dir_len);
+        //fprintf (stderr, "CWD is '%s' (len %d), max_depth %d, max_dir_len %d\n", cwd, totlen, max_depth, max_dir_len);
 
         if (cp [0] != '/')                      /* Path doesn't start at /  */
             dirs [ndirs++] = cp;                /* So first element is always a dir  */
@@ -401,12 +424,12 @@ static void add_cwd (struct segs *s, const char *cwd, const char *homedir, int c
                one directory.)   */
             dir_missing_ellipsis_needed_p = (abs_max_depth > 1);
 
-            /* If CWD_MAX_DEPTH is negative, only lastmost dirs are used.
+            /* If max_depth is negative, only lastmost dirs are used.
                Otherwise, it's organised as follows: LAST FIRST LAST-1 FIRST+1 ...  */
             do
             {
                 using_p [lx--] = 1;
-                if (--avail >= 0 && cwd_max_depth > 0)
+                if (--avail >= 0 && max_depth > 0)
                 {
                     using_p [fx++] = 1;
                     --avail;
@@ -480,34 +503,33 @@ static int usage (int exit_code)
     printf ("Usage: tpwl OPTIONS [TEXT]\n");
     printf ("Tiny Powerline-style prompt for bash - set PS1 to resulting string\n");
     printf ("PS1 prompt is constructed in order of appearance of the following options\n");
-    printf ("Order is important, e.g. you should have '--cwd-max-depth=N' before '--pwd'\n\n");
-    printf (" --patched/--compat/--flat  Use patched Powerline fonts for prompt component\n"
-            "                            separators, or ASCII versions, or no separators\n");
-    printf (" --user[=BLAH]              Indicate user in PS1 (explicitly or bash '\\u')\n");
-    printf (" --pwd[=PATH]               Indicate working dir in PS1 (implicitly '$PWD')\n");
-    printf (" --plain                    Do not split working directory path a la Powerline\n");
-    printf (" --host[=NAME]              Indicate hostname in PS1 (explicitly or bash '\\h')\n");
-    printf (" --history                  Add bash command history number in prompt ('\\!')\n");
-    printf (" --prompt=BLAH              Override PS1 bash prompt from default ('\\$')\n");
-    printf (" --title[=XTEXT]            Set terminal title to \"user@host: $PWD [ - XTEXT]\"\n"
-            "                            (if XTEXT begins with '^', add at start of title instead)\n");
-    printf (" --ssh-[host|user|all]      If ssh is being used, add host / user / both to PS1\n");
-    printf (" --ssh                      Tiny indication in PS1 if ssh is being used\n");
-    printf (" --status=$?                Indicate status of last command\n");
-    printf (" --home=PATH                If different from HOME env var, substitutes '~' in pwd\n"
-            "                            Note: this arg should appear BEFORE '--pwd' arg\n");
-    printf (" --cwd-max-depth=DEPTH      Maximum number of directories to show in path\n"
-            "                            (if negative, only last DEPTH directories shown)\n");
-    printf (" --cwd-max-dir-size=SIZE    Directory names longer than SIZE will be truncated\n");
-    printf (" --fgbg=FGCOLOR:BGCOLOR     Set color indices to use for user items\n");
-    printf (" --utf8-ok                  Do not use workarounds to fixup Bash prompt length\n");
-    printf (" --tighten                  Don't add spaces around prompt components (shorter PS1)\n");
-    printf (" --help                     Show this help and exit\n");
+    printf ("Order is important, e.g. place '--max-depth=N' before '--pwd'\n\n");
+    printf (" --patched|ascii|flat    Use patched Powerline fonts for prompt component\n"
+            "                         separators, or ASCII versions, or no separators\n");
+    printf (" --plain                 Do not split working directory path a la Powerline\n");
+    printf (" --tight                 Don't add spaces around prompt components (shorter PS1)\n");
+    printf (" --hist                  Add bash command history number in prompt ('\\!')\n");
+    printf (" --status=$?             Indicate status of last command\n");
+    printf (" --depth=DEPTH           Maximum number of directories to show in path\n"
+            "                         (if negative, only last DEPTH directories shown)\n");
+    printf (" --dir-size=SIZE         Directory names longer than SIZE will be truncated\n");
+    printf (" --utf8-ok               Do not use workarounds to fixup Bash prompt length\n");
+    printf (" --user[=BLAH]           Indicate user in PS1 (explicitly or bash '\\u')\n");
+    printf (" --pwd[=PATH]            Indicate working dir in PS1 (implicitly '$PWD')\n");
+    printf (" --host[=NAME]           Indicate hostname in PS1 (explicitly or bash '\\h')\n");
+    printf (" --prompt=BLAH           Override PS1 bash prompt from default ('\\$')\n");
+    printf (" --title[=XTEXT]         Set terminal title to \"user@host: $PWD [ - XTEXT]\"\n"
+            "                         (if XTEXT begins with '^', add at start of title instead)\n");
+    printf (" --ssh-[host|user|all]   Only if ssh is being used, add host / user / both to PS1\n");
+    printf (" --ssh                   Tiny indication in PS1 if ssh is being used\n");
+    printf (" --home=PATH             If different from HOME env var, substitutes '~' in pwd\n"
+            "                         Note: this arg should appear BEFORE '--pwd' arg\n");
+    printf (" --fb=FGCOLOR:BGCOLOR    Set fore/back color indices to use for user items\n");
+    printf ("                         (Negative index will leave color as it was)\n");
+    printf (" --help                  Show this help and exit\n");
     printf ("\n");
-    printf ("tpwl is (very) loosely based on https://github.com/banga/powerline-shell\n");
-    printf ("Hacked together in C and implements ONLY the stuff that I use - no version control, etc.\n");
+    printf ("See tpwl project page at https://github.com/turly/tpwl\n");
     printf ("Version %s, built on %s %s\n", TPWL_VERSION, __DATE__, __TIME__);
-    printf ("\n");
     exit (exit_code);
 }
 
@@ -530,20 +552,22 @@ int main (int argc, const char *argv [])
 {
     const int   ssh_p = (getenv ("SSH_CLIENT") != 0);
     int         bad_status_p = 0;
-    const char  *prompt = 0;                        /* Defaults to history prompt  */
+    const char  *prompt = 0;                        /* Defaults to '\$'  */
     const char  *homedir = NULL;
     struct segs *s = &pwl_segs;
-    int         cwd_max_depth = 5;                  /* use ellipsis if #CWD dirs is > this  */
-    int         cwd_max_dir_size = 10;              /* Max dir len for each dir in CWD  */
+    int         max_depth = 5;                      /* use ellipsis if #CWD dirs is > this  */
+    int         max_dir_size = 10;                  /* Max dir len for each dir in CWD  */
     const char  *title_extra = NULL;                /* Non-NULL if --title specified  */
     int         fancy_p = 1;                        /* Fancy directory splitting?  */
     int         history_p = 0;                      /* Include bash history cmd number in PS1?  */
-    uint8_t     u_fg = PATH_FG, u_bg = PATH_BG;     /* User foreground / background colours  */
+    uint8_t     u_fg = PATH_BG, u_bg = PATH_FG;     /* User foreground / background colours  */
     int         ix;
 
     /* PS1 is built up in the order args are encountered, therefore the
        arg order is important - for example, --home=PATH should appear
-       before --pwd (which is what "prints" the working directory.)  */
+       before --pwd (which is what "prints" the working directory to PS1,
+       so if we want '~' to be substituted for the home directory, we need
+       to know if it's different from $HOME.)  */
 
     for (ix = 1; ix < argc; ++ix)                   /* FIXME: Use optargs or something  */
     {
@@ -553,7 +577,7 @@ int main (int argc, const char *argv [])
         if (strcmp (arg, "--help") == 0 || strcmp (arg, "-h") == 0)
             usage (0);
         else
-        if (strcmp (arg, "--bash-groks-utf8") == 0 || strcmp (arg, "--utf8-ok") == 0)
+        if (strcmp (arg, "--utf8-ok") == 0)
             bash_handles_utf8_p = 1;
         else
         if (strcmp (arg, "--version") == 0)
@@ -562,44 +586,44 @@ int main (int argc, const char *argv [])
             return 0;
         }
         else
-        if (strbegins_p (arg, "--fgbg="))
+        if (strbegins_p (arg, "--fgbg=") || strbegins_p (arg, "--fb="))
         {
             int f, b;
-            if (sscanf (arg, "--fgbg=%i:%i", &f, &b) != 2)
-                fatal ("tpwl: can't parse arg: '%s' (expected --fgbg=INTEGER:INTEGER)\n", arg);
+            if (sscanf (strchr (arg, '='), "=%i:%i", &f, &b) != 2)
+                fatal ("tpwl: can't parse arg: '%s' (expected --fb=INTEGER:INTEGER)\n", arg);
             if (f > 0 && f < 255) u_fg = f;     /* -1 will leave previous U_FG value  */
             if (b > 0 && b < 255) u_bg = b;
         }
         else
-        if (strbegins_p (arg, "--cwd-max-depth="))
+        if (strbegins_p (arg, "--max-depth=") || strbegins_p (arg, "--depth="))
         {
-            if (sscanf (arg, "--cwd-max-depth=%i", &cwd_max_depth) != 1)
+            if (sscanf (strchr (arg, '='), "=%i", &max_depth) != 1)
                 fatal ("tpwl: can't parse arg: '%s'\n", arg);
         }
         else
-        if (strbegins_p (arg, "--cwd-max-dir-size="))
+        if (strbegins_p (arg, "--max-dir-size=") || strbegins_p (arg, "--dir-size="))
         {
-            if (sscanf (arg, "--cwd-max-dir-size=%i", &cwd_max_dir_size) != 1)
+            if (sscanf (strchr (arg, '='), "=%i", &max_dir_size) != 1)
                 fatal ("tpwl: can't parse arg: '%s'\n", arg);
-            if (cwd_max_dir_size < 4)
-                fatal ("tpwl: %s specifies illegal size %d (min 4)\n", arg, cwd_max_dir_size);
+            if (max_dir_size < 4)
+                fatal ("tpwl: %s specifies illegal size %d (min 4)\n", arg, max_dir_size);
         }
         else
         if (strcmp (arg, "--plain") == 0) fancy_p = 0;              /* No fancy > Powerline > path > splits  */ 
         else
         if (strcmp (arg, "--patched") == 0) symtyp = SYM_PATCHED;   /* Patched Powerline fonts available  */
         else
-        if (strcmp (arg, "--compat") == 0) symtyp = SYM_COMPAT;     /* ASCII versions (">", "..." etc)  */
+        if (strcmp (arg, "--ascii") == 0) symtyp = SYM_ASCII;       /* ">", "..."  */
         else
-        if (strcmp (arg, "--flat") == 0) symtyp = SYM_FLAT;         /* Nothing!  */
+        if (strcmp (arg, "--flat") == 0) symtyp = SYM_FLAT;         /* Nothing, relies on colours to separate items  */
         else
-        if (strcmp (arg, "--tighten") == 0) spaced_p = 0;
+        if (strcmp (arg, "--tight") == 0) spaced_p = 0;             /* Shorter PS1  */
         else
-        if (strcmp (arg, "--history") == 0) history_p = 1;
+        if (strcmp (arg, "--history") == 0 || strcmp (arg, "--hist") == 0) history_p = 1;
         else
         if (strcmp (arg, "--ssh") == 0 || strcmp (arg, "--ssh-all") == 0)  /* add whether we're ssh  */
         {
-            if (ssh_p)                              /* Only done if SSH active  */
+            if (ssh_p)                                              /* Only done if SSH active  */
             {
                 append (s, info_symbols [symtyp].network, SSH_FG, SSH_BG);
                 if (strcmp (arg, "--ssh-all") == 0)
@@ -623,12 +647,12 @@ int main (int argc, const char *argv [])
             ;
 #endif
         else
-        if (strcmp (arg, "--ssh-host") == 0 || strcmp (arg, "--sshhost") == 0)
+        if (strcmp (arg, "--ssh-host") == 0)
         {
             if (ssh_p) add_host (s, NULL);          /* If we're SSH-ing, show host  */
         }
         else
-        if (strcmp (arg, "--ssh-user") == 0 || strcmp (arg, "--sshuser") == 0)
+        if (strcmp (arg, "--ssh-user") == 0)
         {
             if (ssh_p) add_user (s, NULL);          /* If we're SSH-ing, show user  */
         }
@@ -641,7 +665,7 @@ int main (int argc, const char *argv [])
             add_cwd (s,
                      (arg [5] == '=') ? arg + 6 : getenv ("PWD"),   /* the directory to display  */
                      (homedir) ? homedir : getenv ("HOME"), 
-                     cwd_max_depth, cwd_max_dir_size, fancy_p);
+                     max_depth, max_dir_size, fancy_p);
         }
         else
         if (strbegins_p (arg, "--host"))            /* Can have explicit --host=name or just --host to use bash \\h  */

@@ -30,18 +30,22 @@ Put the _tpwl_ binary somewhere on your PATH.
 
 ## Checking it works and experimenting with it
 
-In bash, type
+Use `tpwl --help` to see the available options.  Assuming you are using a
+[patched Powerline font](https://github.com/powerline/fonts), you can quickly test it out by doing
+
 ```bash
-PS1=$(tpwl --ssh-all --history --pwd --status=$? --title)
+PS1=$(tpwl --ssh-all --hist --pwd --status=$? --title)
 ```
 and note the changes in your prompt.  `tpwl --help` will show you all the options.
+
+If you're not using a patched Powerline font, add `--ascii` to the _tpwl_ args.
 
 ## Usage
 
 If you're happy with it, you could add something like this to your _.bashrc_:
 ```bash
 function _update_ps1() {
-    PS1="$(tpwl --history --ssh-all --cwd-max-depth=-4 --cwd-max-dir-size=10 --pwd --status=$? --title)"
+    PS1="$(tpwl --hist --ssh-all --depth=-4 --dir-size=10 --pwd --status=$? --title)"
 }
 if [[ "$PROMPT_COMMAND" != *_update_ps1* ]]; then   # doesn't already contain _update_ps1
     PROMPT_COMMAND="_update_ps1; $PROMPT_COMMAND"
@@ -50,11 +54,11 @@ if [[ "$PROMPT_COMMAND" != *_update_ps1* ]]; then   # doesn't already contain _u
 This will arrange for the bash function `_update_ps1` to be called every time bash outputs a prompt.
 `update_ps1` just sets `PS1` to whatever string is printed by the _tpwl_ invocation.
 
-Here's what's in my _.bashrc_, a bit more complicated as I have different 
+Here's what's in my work _.bashrc_, a bit more complicated as I have different 
 parameters depending on whether I'm in a Clearcase view, plus I don't want
-to call tpwl every time as it's on a network drive.  To this end it relies
+to call _tpwl_ every time as it's likely on a network drive.  To this end it relies
 on other code setting the `PS1_NEEDS_UPDATE_P` shell variable - look at 
-the `cd` function for example.  Note that because _tpwl_ is not
+the `cd` function for example.  Note that because _tpwl_ is _not_
 called every time, I don't use the `--status=$?` arg.
 
 ```bash
@@ -75,23 +79,23 @@ PS1="[\\W]\\! \\$ "                 # Simple prompt by default
 if [ "$TERM" != "linux" ]; then                         # not Linux console
   TPWL="~/bin/$OSTYPE/tpwl"
   if [ -x "$TPWL" ]; then
-    TPWL_ARGS="--history"                               # --tighten --plain
+    TPWL_ARGS="--hist"                                  # --tight --plain
     if [ "$CLEARCASE_VIEW" != "" ]; then                # Special update_ps1 for Clearcase view
         function _update_ps1() {
           if [ $PS1_NEEDS_UPDATE_P -eq 1 ] ; then
             #branch_str=$'\xee\x82\xa0'                  # Powerline font's BRANCH glyph U+E0A0
             #branch_str="$branch_str "                   # space after
             PS1_NEEDS_UPDATE_P=0
-            PS1="$($TPWL $TPWL_ARGS --ssh-all --fgbg=240:123 $CLEARCASE_VIEW \
-                   --fgbg=240:6 " $branch_str$CLEARCASE_BRANCH" \
-                   --cwd-max-depth=-4 --cwd-max-dir-size=10 --pwd --title=^$CLEARCASE_VIEW)"
+            PS1="$($TPWL $TPWL_ARGS --ssh-all --fb=240:123 $CLEARCASE_VIEW \
+                   --fb=240:6 " $branch_str$CLEARCASE_BRANCH" \
+                   --depth=-4 --dir-size=10 --pwd --title=^$CLEARCASE_VIEW)"
           fi
         }
     else                                                # no CLEARCASE_VIEW
         function _update_ps1() {
           if [ $PS1_NEEDS_UPDATE_P -eq 1 ] ; then
             PS1_NEEDS_UPDATE_P=0
-            PS1="$($TPWL $TPWL_ARGS --ssh-all --cwd-max-depth=-4 --cwd-max-dir-size=10 --pwd --title)"
+            PS1="$($TPWL $TPWL_ARGS --ssh-all --depth=-4 --dir-size=10 --pwd --title)"
           fi
         }
     fi                                                  # CLEARCASE_VIEW
@@ -108,32 +112,36 @@ $ tpwl --help
 Usage: tpwl OPTIONS [TEXT]
 Tiny Powerline-style prompt for bash - set PS1 to resulting string
 PS1 prompt is constructed in order of appearance of the following options
-Order is important, e.g. you should have '--cwd-max-depth=N' before '--pwd'
+Order is important, e.g. place '--max-depth=N' before '--pwd'
 
- --patched/--compat/--flat  Use patched Powerline fonts for prompt component
-                            separators, or ASCII versions, or no separators
- --user[=BLAH]              Indicate user in PS1 (explicitly or bash '\u')
- --pwd[=PATH]               Indicate working dir in PS1 (implicitly '$PWD')
- --plain                    Do not split working directory path a la Powerline
- --host[=NAME]              Indicate hostname in PS1 (explicitly or bash '\h')
- --history                  Add bash command history number in prompt ('\!')
- --prompt=BLAH              Override PS1 bash prompt from default ('\$')
- --title[=XTEXT]            Set terminal title to "user@host: $PWD [ - XTEXT]"
-                            (if XTEXT begins with '^', add at start of title instead)
- --ssh-[host|user|all]      If ssh is being used, add host / user / both to PS1
- --ssh                      Tiny indication in PS1 if ssh is being used
- --status=$?                Indicate status of last command
- --home=PATH                If different from HOME env var, substitutes '~' in pwd
-                            Note: this arg should appear BEFORE '--pwd' arg
- --cwd-max-depth=DEPTH      Maximum number of directories to show in path
-                            (if negative, only last DEPTH directories shown)
- --cwd-max-dir-size=SIZE    Directory names longer than SIZE will be truncated
- --fgbg=FGCOLOR:BGCOLOR     Set color indices to use for user items
- --utf8-ok                  Do not use workarounds to fixup Bash prompt length
- --tighten                  Don't add spaces around prompt components (shorter PS1)
- --help                     Show this help and exit
+ --patched|ascii|flat    Use patched Powerline fonts for prompt component
+                         separators, or ASCII versions, or no separators
+ --plain                 Do not split working directory path a la Powerline
+ --tight                 Don't add spaces around prompt components (shorter PS1)
+ --hist                  Add bash command history number in prompt ('\!')
+ --status=$?             Indicate status of last command
+ --depth=DEPTH           Maximum number of directories to show in path
+                         (if negative, only last DEPTH directories shown)
+ --dir-size=SIZE         Directory names longer than SIZE will be truncated
+ --utf8-ok               Do not use workarounds to fixup Bash prompt length
+ --user[=BLAH]           Indicate user in PS1 (explicitly or bash '\u')
+ --pwd[=PATH]            Indicate working dir in PS1 (implicitly '$PWD')
+ --host[=NAME]           Indicate hostname in PS1 (explicitly or bash '\h')
+ --prompt=BLAH           Override PS1 bash prompt from default ('\$')
+ --title[=XTEXT]         Set terminal title to "user@host: $PWD [ - XTEXT]"
+                         (if XTEXT begins with '^', add at start of title instead)
+ --ssh-[host|user|all]   Only if ssh is being used, add host / user / both to PS1
+ --ssh                   Tiny indication in PS1 if ssh is being used
+ --home=PATH             If different from HOME env var, substitutes '~' in pwd
+                         Note: this arg should appear BEFORE '--pwd' arg
+ --fb=FGCOLOR:BGCOLOR    Set fore/back color indices to use for user items
+                         (Negative index will leave color as it was)
+ --help                  Show this help and exit
 
-tpwl is (very) loosely based on https://github.com/banga/powerline-shell
-Hacked together in C and implements ONLY the stuff that I use - no version control, etc.
+See _tpwl_ project page at https://github.com/turly/tpwl
 ```
+
+# License
+
+_tpwl_ is MIT Licensed.  See the LICENSE file.
 
