@@ -26,7 +26,7 @@ Download tpwl.c and do
 ```bash
 cc -Wall -Wextra -Werror tpwl.c -o tpwl
 ```
-Put the binary somewhere reachable - mine's in /usr/local/bin/tpwl.
+Put the _tpwl_ binary somewhere on your PATH.
 
 ## Checking it works and experimenting with it
 
@@ -48,13 +48,13 @@ if [[ "$PROMPT_COMMAND" != *_update_ps1* ]]; then   # doesn't already contain _u
 ```
 
 This will arrange for the bash function `_update_ps1` to be called every time bash outputs a prompt.
-`update_ps1` just calls sets `PS1` to whatever string is printed by the _tpwl_ invocation.
+`update_ps1` just sets `PS1` to whatever string is printed by the _tpwl_ invocation.
 
 Here's what's in my _.bashrc_, a bit more complicated as I have different 
 parameters depending on whether I'm in a Clearcase view, plus I don't want
 to call tpwl every time as it's on a network drive.  To this end it relies
-on other code setting the `PS1_NEEDS_UPDATE_P` shell variable
-- look at the `cd` function for example.  Note that because _tpwl_ is not
+on other code setting the `PS1_NEEDS_UPDATE_P` shell variable - look at 
+the `cd` function for example.  Note that because _tpwl_ is not
 called every time, I don't use the `--status=$?` arg.
 
 ```bash
