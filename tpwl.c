@@ -415,7 +415,7 @@ static void add_cwd (struct segs *s, const char *cwd, const char *homedir, int m
         if (ndirs > abs_max_depth)              /* We'll be skipping at least one dir...  */
         {
             int avail = abs_max_depth - 1;
-            int fx = 0, lx = ndirs - 1;
+            int usinglen = 0, fx = 0, lx = ndirs - 1;
 
             memset (using_p, 0, ndirs);         /* Say we're not using any dir component  */
 
@@ -428,13 +428,20 @@ static void add_cwd (struct segs *s, const char *cwd, const char *homedir, int m
                Otherwise, it's organised as follows: LAST FIRST LAST-1 FIRST+1 ...  */
             do
             {
+                usinglen += lens [lx];
                 using_p [lx--] = 1;
                 if (--avail >= 0 && max_depth > 0)
                 {
+                    usinglen += lens [fx];
                     using_p [fx++] = 1;
                     --avail;
                 }
-            } while (avail >= 0);                
+            } while (avail >= 0);
+
+            /* If all the text we're using "fits", we can avoid truncating 
+               directory names.  */
+            if (usinglen < abs_max_depth * max_dir_len)
+                entire_p = 1;
         }
         else
             memset (using_p, 1, ndirs);         /* Using all dirs  */
@@ -451,11 +458,6 @@ static void add_cwd (struct segs *s, const char *cwd, const char *homedir, int m
                 const char  *component_ptr = dirs [ix];
                 const int   last_p = (ix == ndirs - 1);
                 int         fgcolor = (last_p) ? CWD_FG : PATH_FG;
-                int         twiddle_bodge_p = 0;
-
-                /* Special bodgery for '~' which did not get caught above  */
-                if (ix == 0 && component_ptr [0] == '~')
-                    twiddle_bodge_p = 1;
 
                 *tp = 0;
                 if (dir_missing_ellipsis_needed_p && ix > 0 && using_p [ix - 1] == 0)
@@ -486,9 +488,6 @@ static void add_cwd (struct segs *s, const char *cwd, const char *homedir, int m
                 if ((last_p || split_p) && spaced_p)
                     strcat (thisdir, " ");          /* Extra space for split component  */
 
-                if (twiddle_bodge_p)
-                    xappend (s, thisdir, HOME_FG, HOME_BG, si->sep, HOME_BG);
-                else
                 if (split_p && ! last_p)
                     xappend (s, thisdir, fgcolor, PATH_BG, si->thin, SEPARATOR_FG);
                 else
