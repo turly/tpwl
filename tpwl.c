@@ -226,7 +226,7 @@ static void append (struct segs *s, const char *item, int fg, int bg)
 /* Prints our various segments into the string which will eventually 
    be used as a bash PS1 prompt. 
    TITLE will be non-null if we're to set the window's title too.  */
-static char *drawsegs (char *line, const struct segs *s, const char *title)
+static char *drawsegs (char *line, const struct segs *s, const char *title, int user_host_p)
 {
     unsigned ix;
     unsigned last_fg = CI_NONE, last_bg = CI_NONE;  /* Try to optimise  */
@@ -294,23 +294,28 @@ static char *drawsegs (char *line, const struct segs *s, const char *title)
 
     if (title != NULL)                              /* Want terminal window title  */
     {
+        const char *btitle = (user_host_p) ? "\\u@\\h: \\w" : "\\w";  /* user@host CWD or just CWD  */
+
         strcat (colors, "\\e]0;");                  /* SET TERM TITLE Escape sequence  */
 
-        if (*title == '^')                          /* Extra Title string comes first  */
+        if (title [0] == '^')                       /* Extra Title string comes first  */
         {
-            strncat (colors, title + 1, 96);        /* skip the initial '^'  */
-            strcat (colors, " - ");
-            strcat (colors, "\\u@\\h: \\w");        /* bash 'user @ host  cwd' window title  */
+            if (title [1] != 0)                     /* ... and there IS an extra title string  */
+            {
+                strncat (colors, title + 1, 96);    /* skip the initial '^', impose abritrary length cap :)  */
+                strcat (colors, " - ");
+            }
+            strcat (colors, btitle);                /* bash 'user @ host  cwd' window title  */
         }
         else
-        if (*title != 0)                            /* Extra title string appended to the window title  */
+        if (title [0] != 0)                         /* Extra title string appended to the window title  */
         {
-            strcat (colors, "\\u@\\h: \\w");        /* bash 'user @ host  cwd' window title  */
+            strcat (colors, btitle);                /* bash 'user @ host  cwd' window title  */
             strcat (colors, " - ");
             strncat (colors, title, 96);
         }
         else                                        /* Default title  */
-            strcat (colors, "\\u@\\h: \\w");        /* bash 'user @ host  cwd' window title  */
+            strcat (colors, btitle);                /* bash 'user @ host  cwd' window title  */
 
         strcat (colors, "\\a");                     /* Finish off SET TERM TITLE  */
     }
@@ -503,29 +508,30 @@ static int usage (int exit_code)
     printf ("Tiny Powerline-style prompt for bash - set PS1 to resulting string\n");
     printf ("PS1 prompt is constructed in order of appearance of the following options\n");
     printf ("Order is important, e.g. place '--max-depth=N' before '--pwd'\n\n");
-    printf (" --patched|ascii|flat    Use patched Powerline fonts for prompt component\n"
-            "                         separators, or ASCII versions, or no separators\n");
-    printf (" --plain                 Do not split working directory path a la Powerline\n");
-    printf (" --tight                 Don't add spaces around prompt components (shorter PS1)\n");
-    printf (" --hist                  Add bash command history number in prompt ('\\!')\n");
-    printf (" --status=$?             Indicate status of last command\n");
-    printf (" --depth=DEPTH           Maximum number of directories to show in path\n"
-            "                         (if negative, only last DEPTH directories shown)\n");
-    printf (" --dir-size=SIZE         Directory names longer than SIZE will be truncated\n");
-    printf (" --utf8-ok               Do not use workarounds to fixup Bash prompt length\n");
-    printf (" --user[=BLAH]           Indicate user in PS1 (explicitly or bash '\\u')\n");
-    printf (" --pwd[=PATH]            Indicate working dir in PS1 (implicitly '$PWD')\n");
-    printf (" --host[=NAME]           Indicate hostname in PS1 (explicitly or bash '\\h')\n");
-    printf (" --prompt=BLAH           Override PS1 bash prompt from default ('\\$')\n");
-    printf (" --title[=XTEXT]         Set terminal title to \"user@host: $PWD [ - XTEXT]\"\n"
-            "                         (if XTEXT begins with '^', add at start of title instead)\n");
-    printf (" --ssh-[host|user|all]   Only if ssh is being used, add host / user / both to PS1\n");
-    printf (" --ssh                   Tiny indication in PS1 if ssh is being used\n");
-    printf (" --home=PATH             If different from HOME env var, substitutes '~' in pwd\n"
-            "                         Note: this arg should appear BEFORE '--pwd' arg\n");
-    printf (" --fb=FGCOLOR:BGCOLOR    Set fore/back color indices to use for user items\n");
-    printf ("                         (Negative index will leave color as it was)\n");
-    printf (" --help                  Show this help and exit\n");
+    printf (" --patched|ascii|flat   Use patched Powerline fonts for prompt component\n"
+            "                        separators, or ASCII versions, or no separators\n");
+    printf (" --plain                Do not split working directory path a la Powerline\n");
+    printf (" --tight                Don't add spaces around prompt components (shorter PS1)\n");
+    printf (" --hist                 Add bash command history number in prompt ('\\!')\n");
+    printf (" --status=$?            Indicate status of last command\n");
+    printf (" --depth=DEPTH          Maximum number of directories to show in path\n"
+            "                        (if negative, only last DEPTH directories shown)\n");
+    printf (" --dir-size=SIZE        Directory names longer than SIZE will be truncated\n");
+    printf (" --utf8-ok              Do not use workarounds to fixup Bash prompt length\n");
+    printf (" --user[=BLAH]          Indicate user in PS1 (explicitly or bash '\\u')\n");
+    printf (" --pwd[=PATH]           Indicate working dir in PS1 (implicitly '$PWD')\n");
+    printf (" --host[=NAME]          Indicate hostname in PS1 (explicitly or bash '\\h')\n");
+    printf (" --prompt=BLAH          Override PS1 bash prompt from default ('\\$')\n");
+    printf (" --title[=XTEXT]        Set terminal title to \"ssh-user@ssh-host: $PWD [ - XTEXT]\"\n"
+            "                        ssh-user@ssh-host appears only if ssh is being used.\n"
+            "                        if XTEXT begins with '^', add at start of title instead\n");
+    printf (" --ssh-[host|user|all]  Only if ssh is being used, add host/user/ both to PS1\n");
+    printf (" --ssh                  Tiny indication in PS1 if ssh is being used\n");
+    printf (" --home=PATH            If different from HOME env var, substitutes '~' in pwd\n"
+            "                        Note: this arg should appear BEFORE '--pwd' arg\n");
+    printf (" --fb=FGCOLOR:BGCOLOR   Set fore/back color indices to use for user items\n");
+    printf ("                        (Negative index will leave color as it was)\n");
+    printf (" --help                 Show this help and exit\n");
     printf ("\n");
     printf ("See tpwl project page at https://github.com/turly/tpwl\n");
     printf ("Version %s, built on %s %s\n", TPWL_VERSION, __DATE__, __TIME__);
@@ -700,7 +706,7 @@ int main (int argc, const char *argv [])
     else
         append (s, prompt, CMD_PASSED_FG, CMD_PASSED_BG);
 
-    printf ("%s", drawsegs (pline, s, title_extra));
+    printf ("%s", drawsegs (pline, s, title_extra, ssh_p));
     return 0;
 }
 
