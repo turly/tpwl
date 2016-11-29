@@ -66,20 +66,19 @@ function reset_ps1() {              # In case of screw-up - type reset_ps1
 PS1="[\\W]\\! \\$ "                 # Simple prompt by default
 
 if [ "$TERM" != "linux" ]; then                         # not Linux console
-  TPWL="~/bin/$OSTYPE/tpwl"
-  if [ -x "$TPWL" ]; then
+  if hash tpwl 2>/dev/null; then                        # tpwl binary exists somewhere on PATH
     TPWL_ARGS="--hist"                                  # --tight --plain
     if [ "$CLEARCASE_VIEW" != "" ]; then                # Special update_ps1 for Clearcase view
         function _update_ps1() {
             #branch_str=$'\xee\x82\xa0'                  # Powerline font's BRANCH glyph U+E0A0
             #branch_str="$branch_str "                   # space after
-            PS1="$($TPWL $TPWL_ARGS --ssh-all --fb=240:123 $CLEARCASE_VIEW \
+            PS1="$(tpwl $TPWL_ARGS --ssh-all --fb=240:123 $CLEARCASE_VIEW \
                    --fb=240:6 " $branch_str$CLEARCASE_BRANCH" --status=$? \
                    --depth=-4 --dir-size=10 --pwd --title=^$CLEARCASE_VIEW)"
         }
     else                                                # no CLEARCASE_VIEW
         function _update_ps1() {
-            PS1="$($TPWL $TPWL_ARGS --status=$? --hist --ssh-all --depth=-4 --dir-size=10 --pwd --title)"
+            PS1="$(tpwl $TPWL_ARGS --status=$? --hist --ssh-all --depth=-4 --dir-size=10 --pwd --title)"
         }
     fi                                                  # CLEARCASE_VIEW
     if [[ "$PROMPT_COMMAND" != *_update_ps1* ]]; then   # doesn't already contain _update_ps1
