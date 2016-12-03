@@ -39,7 +39,7 @@ PS1=$(tpwl --ssh-all --hist --pwd --status=$? --title)
 ```
 and note the changes in your prompt.  `tpwl --help` will show you all the options.
 
-If you're not using a patched Powerline font, add `--ascii` to the _tpwl_ args.
+If you're not using a patched Powerline font, add `--ascii` as the first _tpwl_ arg.
 
 ## Usage
 
