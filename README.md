@@ -1,7 +1,7 @@
 # tpwl
 
-*tpwl* is turly's _Tiny Powerline_-style prompt for bash.
-It's fast, written in plain old C, and works well even on an old 133MHz Linux box. 
+*tpwl* is turly's themeable _Tiny Powerline_-style prompt for bash.
+It's fast, written in plain old C, and works well even on an old 80MHz Linux box. 
 
 Set `PS1` to the resulting string and you'll get a Powerline-style bash prompt.
 
@@ -15,11 +15,12 @@ For best results, install and use one of the [patched Powerline fonts](https://g
 
 _**tpwl**_:
 * builds the PS1 string in the order given by its arguments.  Some arguments need to appear before others 
-  as they'll affect the appearance of the later args.
+  as they'll affect the appearance of the later args
 * allows setting of the terminal window's title 
-* works around bash / readline UTF-8 bugs is prompt length calculation but this can be turned off.
+* is themeable
+* works around bash / readline UTF-8 bugs is prompt length calculation but this can be turned off
 * allows arbitrary text (including UTF-8 characters) in arbitrary colors to be added to the prompt, 
-  see the excerpt from my _.bashrc_ below.
+  see the excerpt from my _.bashrc_ below
 
 
 ## Installation
@@ -88,6 +89,19 @@ if [ "$TERM" != "linux" ]; then                         # not Linux console
 fi                                                      # $TERM
 ```
 
+## Themes
+_tpwl_ accepts a `--theme=COLORSTRING` argument, where COLORSTRING is a colon-separated list of xterm color indices 
+(a bit like the `LS_COLORS` scheme used by `ls`.) Or it will use the `TPWL_COLORS` environment variable to the same effect.
+_tpwl_ can visually dump the color scheme with the `--dump-theme` argument - note the order of the color indices in the string goes from USERNAME_FG ("username foreground color") to CMD_FAILED_BG ("command failed background color").
+
+![dump-theme](dump-theme.jpg)
+
+If you just want to change the HOSTNAME_FG / HOSTNAME_BG colors and leave the others at default values, you can do
+```
+export TPWL_COLORS=":::15:0"
+```
+which will set the hostname foreground to be 15 (white) and background to be zero (black.) Obviously you'd have to specify `--host` in your _tpwl_ invocation to see this!
+
 ## Arguments
 ```
 $ tpwl --help
@@ -96,31 +110,36 @@ Tiny Powerline-style prompt for bash - set PS1 to resulting string
 PS1 prompt is constructed in order of appearance of the following options
 Order is important, e.g. place '--max-depth=N' before '--pwd'
 
- --patched|ascii|flat    Use patched Powerline fonts for prompt component
-                         separators, or ASCII versions, or no separators
- --plain                 Do not split working directory path a la Powerline
- --tight                 Don't add spaces around prompt components (shorter PS1)
- --hist                  Add bash command history number in prompt ('\!')
- --status=$?             Indicate status of last command
- --depth=DEPTH           Maximum number of directories to show in path
-                         (if negative, only last DEPTH directories shown)
- --dir-size=SIZE         Directory names longer than SIZE will be truncated
- --utf8-ok               Do not use workarounds to fixup Bash prompt length
- --user[=BLAH]           Indicate user in PS1 (explicitly or bash '\u')
- --pwd[=PATH]            Indicate working dir in PS1 (implicitly '$PWD')
- --host[=NAME]           Indicate hostname in PS1 (explicitly or bash '\h')
- --prompt=BLAH           Override PS1 bash prompt from default ('\$')
- --title[=XTEXT]         Set terminal title to "user@host: $PWD [ - XTEXT]"
-                         (if XTEXT begins with '^', add at start of title instead)
- --ssh-[host|user|all]   Only if ssh is being used, add host / user / both to PS1
- --ssh                   Tiny indication in PS1 if ssh is being used
- --home=PATH             If different from HOME env var, substitutes '~' in pwd
-                         Note: this arg should appear BEFORE '--pwd' arg
- --fb=FGCOLOR:BGCOLOR    Set fore/back color indices to use for user items
-                         (Negative index will leave color as it was)
- --help                  Show this help and exit
+ --patched|ascii|flat   Use patched Powerline fonts for prompt component
+                        separators, or ASCII versions, or no separators
+ --theme=COLORSTRING    Change the tpwl color scheme.  COLORSTRING is a colon-
+                        separated list of xterm color indices.  Env var
+                        TPWL_COLORS=COLORSTRING also works.  See also...
+ --dump-theme           Dumps annotated current theme to stderr, and exits.
+ --plain                Do not split working directory path a la Powerline
+ --tight                Don't add spaces around prompt components (shorter PS1)
+ --hist                 Add bash command history number in prompt ('\!')
+ --status=$?            Indicate status of last command
+ --depth=DEPTH          Maximum number of directories to show in path
+                        (if negative, only last DEPTH directories shown)
+ --dir-size=SIZE        Directory names longer than SIZE will be truncated
+ --utf8-ok              Do not use workarounds to fixup Bash prompt length
+ --user[=BLAH]          Indicate user in PS1 (explicitly or bash '\u')
+ --pwd[=PATH]           Indicate working dir in PS1 (implicitly '$PWD')
+ --host[=NAME]          Indicate hostname in PS1 (explicitly or bash '\h')
+ --prompt=BLAH          Override PS1 bash prompt from default ('\$')
+ --title[=XTEXT]        Set terminal title to "ssh-user@ssh-host: $PWD [ - XTEXT]"
+                        ssh-user@ssh-host appears only if ssh is being used.
+                        if XTEXT begins with '^', add at start of title instead
+ --ssh-[host|user|all]  Only if ssh is being used, add host/user/ both to PS1
+ --ssh                  Tiny indication in PS1 if ssh is being used
+ --home=PATH            If different from HOME env var, substitutes '~' in pwd
+                        Note: this arg should appear BEFORE '--pwd' arg
+ --fb=FGCOLOR:BGCOLOR   Set fore/back color indices to use for user items
+                        (Negative index will leave color as it was)
+ --help                 Show this help and exit
 
-See _tpwl_ project page at https://github.com/turly/tpwl
+See tpwl project page at https://github.com/turly/tpwl
 ```
 
 # License
