@@ -18,7 +18,7 @@ _**tpwl**_:
   as they'll affect the appearance of the later args
 * allows setting of the terminal window's title 
 * is themeable
-* works around bash / readline UTF-8 bugs is prompt length calculation but this can be turned off
+* works around bash / readline UTF-8 bugs is prompt length calculation but this can be turned off (off by default on Macs)
 * allows arbitrary text (including UTF-8 characters) in arbitrary colors to be added to the prompt, 
   see the excerpt from my _.bashrc_ below
 

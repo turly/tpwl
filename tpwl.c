@@ -41,7 +41,11 @@ static const char TPWL_VERSION [] = "0.3";
 /* By default, we say that bash/readline do NOT work properly with UTF-8.
    In that case we use some horrible bodgery to try to fix this - see
    strcpy_with_utf8_encoding () below.  */
-static int bash_handles_utf8_p = 0;
+#ifdef __APPLE__
+static int bash_handles_utf8_p = 1;     /* Mac bash/readline groks UTF-8 */
+#else
+static int bash_handles_utf8_p = 0;     /* Everything else doesn't seem to  */
+#endif
 static int spaced_p = 1;                /* Add extra spaces around certain items  */
 
 /* These are the encodings for the various symbols we use in the prompts.  */
@@ -581,7 +585,7 @@ static int usage (int exit_code)
     printf (" --depth=DEPTH          Maximum number of directories to show in path\n"
             "                        (if negative, only last DEPTH directories shown)\n");
     printf (" --dir-size=SIZE        Directory names longer than SIZE will be truncated\n");
-    printf (" --utf8-ok              Do not use workarounds to fixup Bash prompt length\n");
+    printf (" --[no-]utf8-ok         Do [not] use workarounds to fixup Bash prompt length\n");
     printf (" --user[=BLAH]          Indicate user in PS1 (explicitly or bash '\\u')\n");
     printf (" --pwd[=PATH]           Indicate working dir in PS1 (implicitly '$PWD')\n");
     printf (" --host[=NAME]          Indicate hostname in PS1 (explicitly or bash '\\h')\n");
@@ -652,6 +656,9 @@ int main (int argc, const char *argv [])
         else
         if (strcmp (arg, "--utf8-ok") == 0)
             bash_handles_utf8_p = 1;
+        else
+        if (strcmp (arg, "--no-utf8-ok") == 0)
+            bash_handles_utf8_p = 0;
         else
         if (strbegins_p (arg, "--theme="))
             load_theme (arg + 8);
