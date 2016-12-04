@@ -1,6 +1,6 @@
 /* tpwl.c
 
-   Turly's Tiny Powerline Shell for bash (ONLY) in straight C.
+   Turly's Themeable Tiny Powerline Shell for bash (ONLY) in straight C.
    Project code available at https://github.com/turly/tpwl
 
    (Very) loosely based on https://github.com/banga/powerline-shell
@@ -36,7 +36,7 @@
 #include <assert.h>
 
 static void fatal (const char *fmt_str, ...) __attribute__ ((noreturn, format (printf, 1, 2)));
-static const char TPWL_VERSION [] = "0.2";
+static const char TPWL_VERSION [] = "0.3";
 
 /* By default, we say that bash/readline do NOT work properly with UTF-8.
    In that case we use some horrible bodgery to try to fix this - see
@@ -51,49 +51,107 @@ struct symbol_info_t {
 };
 enum symtype_t {SYM_ASCII, SYM_PATCHED, SYM_FLAT};
 static const struct symbol_info_t info_symbols [] = {
-    {"RO", "SSH", ">", ">", "...", 3},
-    {"\xEE\x82\xA2", "\xEE\x82\xA2", "\xee\x82\xb0", "\xee\x82\xb1", "\xE2\x80\xA6", 1},
-    {"", "", "", "", "", 0}
+    {"RO", "SSH", ">", ">", "...", 3},                                                      /* ASCII  */
+    {"\xEE\x82\xA2", "\xEE\x82\xA2", "\xee\x82\xb0", "\xee\x82\xb1", "\xE2\x80\xA6", 1},    /* Patched Powerline fonts  */
+    {"", "", "", "", "", 0}                                                                 /* FLAT  */
 };
 
-enum color_indices {        /* vaguely based on Python powerline-shell's DefaultColor  */
-    CI_NONE = 0,
-    USERNAME_FG = 250,
-    USERNAME_BG = 240,
-    USERNAME_ROOT_BG = 124,
+/* Encapsulate everything about our colors in a TPWL_COLOR_INDICES macro which
+   contains individual CI_INDEX macros for each color.  This CI_INDEX macro can
+   be redefined and TPWL_COLOR_INDICES expanded using the new definition.
+   See https://jonasjacek.github.io/colors/ for a table with "some" xterm colors  */
+#define TPWL_COLOR_INDICES                                      \
+    /*        NAME              VALUE   XTERMNAME   */          \
+    CI_INDEX (USERNAME_FG,      250,    XTERM_GRAY74)           \
+    CI_INDEX (USERNAME_BG,      240,    XTERM_GRAY35)           \
+    CI_INDEX (USERNAME_ROOT_BG, 124,    XTERM_RED3)             \
+    CI_INDEX (HOSTNAME_FG,      250,    XTERM_GRAY74)           \
+    CI_INDEX (HOSTNAME_BG,      238,    XTERM_GRAY27)           \
+    CI_INDEX (HOME_FG,          15,     XTERM_WHITE)            \
+    CI_INDEX (HOME_BG,          31,     XTERM_DEEPSKYBLUE3)     \
+    CI_INDEX (PATH_FG,          254,    XTERM_GRAY27)           \
+    CI_INDEX (PATH_BG,          32,     XTERM_DEEPSKYBLUE3L)    \
+    CI_INDEX (CWD_FG,           255,    XTERM_GRAY93)           \
+    CI_INDEX (SEPARATOR_FG,     250,    XTERM_GRAY74)           \
+    CI_INDEX (SSH_FG,           254,    XTERM_GRAY89)           \
+    CI_INDEX (SSH_BG,           166,    XTERM_DARKORANGE3)      \
+    CI_INDEX (HISTORY_FG,       251,    XTERM_GRAY78)           \
+    CI_INDEX (CMD_PASSED_FG,    255,    XTERM_GRAY93)           \
+    CI_INDEX (CMD_PASSED_BG,    240,    XTERM_GRAY35)           \
+    CI_INDEX (CMD_FAILED_FG,    15,     XTERM_WHITE)            \
+    CI_INDEX (CMD_FAILED_BG,    161,    XTERM_DEEPPINK3)
 
-    HOSTNAME_FG = 250,
-    HOSTNAME_BG = 238,
+enum color_indices {
+    CI_NONE,
+#define CI_INDEX(NAME, VAL, XTERMNAME)   NAME,
+    TPWL_COLOR_INDICES          /* Expands to list all of USERNAME_FG ... CWD_FAILED_BG  */
 
-    HOME_BG = 31,           // blueish
-    HOME_FG = 15,           // white
-    PATH_BG = 32,           // bluey
-    PATH_FG = 254,          // slightly-off white
-    CWD_FG  = 255,          // whiter white
-    SEPARATOR_FG = 250,
-
-    SSH_BG = 166,           // medium orange
-    SSH_FG = 254,
-
-    CMD_PASSED_BG = 240,    // dark grey
-    HISTORY_FG    = 251,    // greyish white
-    CMD_PASSED_FG = 255,    // whiter white
-    CMD_FAILED_BG = 161,
-    CMD_FAILED_FG = 15,
+    N_COLOR_INDICES
 };
+static uint8_t ctab [N_COLOR_INDICES] = {
+    [CI_NONE] = 0,              // XTERM_BLACK
+#undef CI_INDEX
+#define CI_INDEX(NAME, VAL, XTERMNAME)   [NAME] = VAL,
+    TPWL_COLOR_INDICES          /* Expands to [USERNAME_FG] = 240, ... [CWD_FAILED_BG] = 161  */
+};
+/* We dump to stderr to avoid confusion if someone does PS1=$(tpwl ... --dump-theme)  */
+void dump_themestr (void)
+{
+    int ix;
+    fprintf (stderr, "tpwl theme string is:\n");
+    for (ix = 1; ix < N_COLOR_INDICES; ++ix)
+        fprintf (stderr, "%d%s", ctab [ix], (ix < N_COLOR_INDICES - 1) ? ":" : "");
+    fprintf (stderr, "\n");
 
-static void append_fgcolor (char *b, int code) { if (code != CI_NONE) sprintf (b + strlen (b), "\\e[38;5;%dm", code); }
-static void append_bgcolor (char *b, int code) { if (code != CI_NONE) sprintf (b + strlen (b), "\\e[48;5;%dm", code); }
+    /* This prints out all the indices and their values (along with an example)  */
+#undef CI_INDEX
+#define CI_INDEX(NAME, VAL, XTERMNAME)   \
+    fprintf (stderr, "%16s  %3d  %26s \x1b[48;5;%dm        \x1b[0m\n", #NAME, ctab [NAME], (VAL == ctab [NAME]) ? #XTERMNAME : "", ctab [NAME]);
+    TPWL_COLOR_INDICES
+}
+/* Allow theme to be overridden.  For now, a dumb string with all the
+   individual ctab elements, like so:
+     "250:240:124:250:238:15:31:254:32:255:250:254:166:251:255:240:15:161"
+   Individual items can be skipped, eg ":::14" will set the 4th entry to 14.  */
+int load_theme (const char *str)
+{
+    int         ch, ix = 1;     // Start overwriting at entry #1 - entry #0 C_NONE is not used
+    const char  *p = str;
+
+    while ((ch = *p++) != 0)
+    {
+        if (ch == ':') ++ix;    // skip to next ctab entry (allows skipping entries like ":::23")
+        else
+        if (ch >= '0' && ch <= '9')
+        {
+            ch -= '0';
+            while (*p >= '0' && *p <= '9')
+                ch = (ch * 10) + *p++ - '0';
+            if (ch >= 0 && ch <= 255 && ix < N_COLOR_INDICES) ctab [ix] = ch;
+        }
+        else
+        {
+            fprintf (stderr, "tpwl: theme string parse error at '%s'\n", p - 1);
+            return -1;
+        }
+    }
+    return 0;
+}
+#define CTAB_EXPLICIT_INDEX_MASK 0x100          /* Value is explicit xterm index, not a ctab [] index.  */
+
+static int xctab (int code) { return (code & CTAB_EXPLICIT_INDEX_MASK) ? code & 0xFF : ctab [code & 0xFF]; }
+static void append_fgcolor (char *b, int code) { sprintf (b + strlen (b), "\\e[38;5;%dm", xctab (code)); }
+static void append_bgcolor (char *b, int code) { sprintf (b + strlen (b), "\\e[48;5;%dm", xctab (code)); }
 
 static char             pline [8192];           /* "Big enough" (ahem) to avoid checks  */
 static enum symtype_t   symtyp = SYM_PATCHED;   /* Assume patched fonts available - use --compat otherwise  */
 
 #define MAXSEGS 64
 struct segment_t {                              /* Individual segment ("chunk") of bash prompt  */
-    uint8_t fgcolor, bgcolor;
-    uint8_t sep_fg;
-    char    sep [4];                            /* Must NOT be truncated */
-    char    item [128 - (3 + 4)];               /* Could be truncated  */ 
+    uint16_t    fgcolor, bgcolor;
+    uint16_t    sep_fg;
+    char        sep [4];                        /* Must NOT be truncated */
+    char        item [128 - (6 + 4)];           /* Could be truncated  */ 
 };
 static struct segs {
     struct segment_t segs [MAXSEGS];
@@ -201,7 +259,7 @@ static int strcpy_with_utf8_encoding (char *d, const char *s)
     return last_was_esc_p;
 }                                               /* strcpy_with_utf8_encoding ()  */
                                                     
-/* Extended append an item to the PS1 segment list  - specifies everything!  */
+/* Extended append an item to the PS1 segment list  - explicitly specifies everything!  */
 static void xappend (struct segs *s, const char *item, int fg, int bg, const char *sep, int sep_fg)
 {
     assert (s->nsegs < MAXSEGS);
@@ -225,8 +283,10 @@ static void append (struct segs *s, const char *item, int fg, int bg)
 
 /* Prints our various segments into the string which will eventually 
    be used as a bash PS1 prompt. 
-   TITLE will be non-null if we're to set the window's title too.  */
-static char *drawsegs (char *line, const struct segs *s, const char *title, int user_host_p)
+   TITLE will be non-null if we're to set the window's title to CWD.  
+   TITLE_USER_HOST_P says whether to prepend user@host to the window's title.  */
+
+static char *drawsegs (char *line, const struct segs *s, const char *title, int title_user_host_p)
 {
     unsigned ix;
     unsigned last_fg = CI_NONE, last_bg = CI_NONE;  /* Try to optimise  */
@@ -260,7 +320,7 @@ static char *drawsegs (char *line, const struct segs *s, const char *title, int 
 
         last_was_escape_p = strcpy_with_utf8_encoding (line + strlen (line), sp->item);
 
-        /* Now add any final colours - also nonprintable  */
+        /* Now add any final colors - also nonprintable  */
         colors [0] = 0;
         if (ix < s->nsegs - 1)
         {
@@ -294,7 +354,7 @@ static char *drawsegs (char *line, const struct segs *s, const char *title, int 
 
     if (title != NULL)                              /* Want terminal window title  */
     {
-        const char *btitle = (user_host_p) ? "\\u@\\h: \\w" : "\\w";  /* user@host CWD or just CWD  */
+        const char *btitle = (title_user_host_p) ? "\\u@\\h: \\w" : "\\w";  /* user@host CWD or just CWD  */
 
         strcat (colors, "\\e]0;");                  /* SET TERM TITLE Escape sequence  */
 
@@ -462,7 +522,7 @@ static void add_cwd (struct segs *s, const char *cwd, const char *homedir, int m
                 int         thislen = lens [ix];
                 const char  *component_ptr = dirs [ix];
                 const int   last_p = (ix == ndirs - 1);
-                int         fgcolor = (last_p) ? CWD_FG : PATH_FG;
+                int         fgx = (last_p) ? CWD_FG : PATH_FG;
 
                 *tp = 0;
                 if (dir_missing_ellipsis_needed_p && ix > 0 && using_p [ix - 1] == 0)
@@ -494,9 +554,9 @@ static void add_cwd (struct segs *s, const char *cwd, const char *homedir, int m
                     strcat (thisdir, " ");          /* Extra space for split component  */
 
                 if (split_p && ! last_p)
-                    xappend (s, thisdir, fgcolor, PATH_BG, si->thin, SEPARATOR_FG);
+                    xappend (s, thisdir, fgx, PATH_BG, si->thin, SEPARATOR_FG);
                 else
-                    xappend (s, thisdir, fgcolor, PATH_BG, (last_p) ? si->sep : "", PATH_BG);
+                    xappend (s, thisdir, fgx, PATH_BG, (last_p) ? si->sep : "", PATH_BG);
             }
         }                                           /* for (ndirs)  */
     }                                               /* if (*cwd)  */
@@ -510,6 +570,10 @@ static int usage (int exit_code)
     printf ("Order is important, e.g. place '--max-depth=N' before '--pwd'\n\n");
     printf (" --patched|ascii|flat   Use patched Powerline fonts for prompt component\n"
             "                        separators, or ASCII versions, or no separators\n");
+    printf (" --theme=COLORSTRING    Change the tpwl color scheme.  COLORSTRING is a colon-\n"
+            "                        separated list of xterm color indices.  Env var\n"
+            "                        TPWL_COLORS=COLORSTRING also works.  See also...\n");
+    printf (" --dump-theme           Dumps annotated current theme to stderr, and exits.\n");
     printf (" --plain                Do not split working directory path a la Powerline\n");
     printf (" --tight                Don't add spaces around prompt components (shorter PS1)\n");
     printf (" --hist                 Add bash command history number in prompt ('\\!')\n");
@@ -565,8 +629,12 @@ int main (int argc, const char *argv [])
     const char  *title_extra = NULL;                /* Non-NULL if --title specified  */
     int         fancy_p = 1;                        /* Fancy directory splitting?  */
     int         history_p = 0;                      /* Include bash history cmd number in PS1?  */
-    uint8_t     u_fg = PATH_BG, u_bg = PATH_FG;     /* User foreground / background colours  */
+    unsigned    u_fg = PATH_BG, u_bg = PATH_FG;     /* Additional string foreground / background colors  */
     int         ix;
+
+    const char  *themestr = getenv ("TPWL_COLORS");
+    if (themestr)
+        load_theme (themestr);
 
     /* PS1 is built up in the order args are encountered, therefore the
        arg order is important - for example, --home=PATH should appear
@@ -585,6 +653,15 @@ int main (int argc, const char *argv [])
         if (strcmp (arg, "--utf8-ok") == 0)
             bash_handles_utf8_p = 1;
         else
+        if (strbegins_p (arg, "--theme="))
+            load_theme (arg + 8);
+        else
+        if (strcmp (arg, "--dump-theme") == 0)      /* Dump theme and exit  */
+        {
+            dump_themestr ();
+            exit (0);
+        }
+        else
         if (strcmp (arg, "--version") == 0)
         {
             fprintf (stderr, "tpwl version %s built on %s %s\n", TPWL_VERSION, __DATE__, __TIME__);
@@ -596,8 +673,8 @@ int main (int argc, const char *argv [])
             int f, b;
             if (sscanf (strchr (arg, '='), "=%i:%i", &f, &b) != 2)
                 fatal ("tpwl: can't parse arg: '%s' (expected --fb=INTEGER:INTEGER)\n", arg);
-            if (f > 0 && f < 255) u_fg = f;     /* -1 will leave previous U_FG value  */
-            if (b > 0 && b < 255) u_bg = b;
+            if (f >= 0 && f <= 255) u_fg = f | CTAB_EXPLICIT_INDEX_MASK;     /* -1 will leave previous U_FG value  */
+            if (b >= 0 && b <= 255) u_bg = b | CTAB_EXPLICIT_INDEX_MASK;
         }
         else
         if (strbegins_p (arg, "--max-depth=") || strbegins_p (arg, "--depth="))
@@ -620,7 +697,7 @@ int main (int argc, const char *argv [])
         else
         if (strcmp (arg, "--ascii") == 0) symtyp = SYM_ASCII;       /* ">", "..."  */
         else
-        if (strcmp (arg, "--flat") == 0) symtyp = SYM_FLAT;         /* Nothing, relies on colours to separate items  */
+        if (strcmp (arg, "--flat") == 0) symtyp = SYM_FLAT;         /* Nothing, relies on colors to separate items  */
         else
         if (strcmp (arg, "--tight") == 0) spaced_p = 0;             /* Shorter PS1  */
         else
@@ -684,7 +761,7 @@ int main (int argc, const char *argv [])
         else
         if (arg [0] == '-' && arg [1] == '-')       /* No idea.  */
             fatal ("tpwl: unknown arg '%s'\n", arg);
-        else
+        else                                        /* An additional user string - add it with the user colors  */
         {
             char buf [512];
             if (spaced_p)
