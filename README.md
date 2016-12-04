@@ -24,11 +24,13 @@ _**tpwl**_:
 
 
 ## Installation
-Download tpwl.c and do
+Using git is highly recommended:
 ```bash
+git clone https://github.com/turly/tpwl
+cd tpwl
 cc -O2 -Wall -Wextra -Werror tpwl.c -o tpwl
 ```
-Put the _tpwl_ binary somewhere on your PATH.
+Or otherwise download tpwl.c, compile it as above, and put the _tpwl_ binary somewhere on your PATH.
 
 ## Checking it works and experimenting with it
 
@@ -38,7 +40,7 @@ Use `tpwl --help` to see the available options.  Assuming you are using a
 ```bash
 PS1=$(tpwl --ssh-all --hist --pwd --status=$? --title)
 ```
-and note the changes in your prompt.  `tpwl --help` will show you all the options.
+and note the changes in your prompt and Terminal window title.  `tpwl --help` will show you all the options.
 
 If you're not using a patched Powerline font, add `--ascii` as the first _tpwl_ arg.
 
@@ -100,7 +102,7 @@ If you just want to change the HOSTNAME_FG / HOSTNAME_BG colors and leave the ot
 ```
 export TPWL_COLORS=":::15:0"
 ```
-which will set the hostname foreground to be 15 (white) and background to be zero (black.) Obviously you'd have to specify `--host` in your _tpwl_ invocation to see this!
+which will set the hostname foreground to be 15 (white) and background to be zero (black.) Obviously you'd have to specify `--host` in your _tpwl_ invocation to see any effects.  A good source of info regarding xterm color indices is [available here](https://jonasjacek.github.io/colors/).
 
 ## Arguments
 ```
