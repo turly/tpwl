@@ -38,7 +38,7 @@ Use `tpwl --help` to see the available options.  Assuming you are using a
 [patched Powerline font](https://github.com/powerline/fonts), you can quickly test it out by doing
 
 ```bash
-PS1=$(tpwl --ssh-all --hist --pwd --status=$? --title)
+PS1=$(tpwl --ssh-all --hist --pwd --title)
 ```
 and note the changes in your prompt and Terminal window title.  `tpwl --help` will show you all the options.
 
