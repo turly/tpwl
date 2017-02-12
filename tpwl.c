@@ -539,7 +539,8 @@ static void add_cwd (struct segs *s, const char *cwd, const char *homedir, int m
 
                 if (split_p || abs_max_depth == 1)
                 {
-                    if (component_ptr [0] == '/')   /* Toss slash  */
+                    /* Toss leading slash, unless that's all there is!  */
+                    if (component_ptr [0] == '/' && thislen > 1)
                     {
                         ++component_ptr;
                         --thislen;
