@@ -8,7 +8,7 @@
 
    MIT License
 
-    Copyright (c) 2016 turly o'connor
+    Copyright (c) 2016-2017 turly o'connor
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
@@ -51,7 +51,7 @@ static int spaced_p = 1;                /* Add extra spaces around certain items
 /* These are the encodings for the various symbols we use in the prompts.  */
 struct symbol_info_t {
     const char lock [4], network [4], sep [4], thin [4], ellipsis [4];
-    int   ellipsis_width;                           /* In characters, not string bytes  */
+    int   ellipsis_width;               /* In character glyphs, not string bytes  */
 };
 enum symtype_t {SYM_ASCII, SYM_PATCHED, SYM_FLAT};
 static const struct symbol_info_t info_symbols [] = {
@@ -113,7 +113,7 @@ void dump_themestr (void)
     fprintf (stderr, "%16s  %3d  %26s \x1b[48;5;%dm        \x1b[0m\n", #NAME, ctab [NAME], (VAL == ctab [NAME]) ? #XTERMNAME : "", ctab [NAME]);
     TPWL_COLOR_INDICES
 }
-/* Allow theme to be overridden.  For now, a dumb string with all the
+/* Allow theme to be overridden.  For now, a dumb string with all 18
    individual ctab elements, like so:
      "250:240:124:250:238:15:31:254:32:255:250:254:166:251:255:240:15:161"
    Individual items can be skipped, eg ":::14" will set the 4th entry to 14.  */
