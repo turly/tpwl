@@ -36,7 +36,7 @@
 #include <assert.h>
 
 static void fatal (const char *fmt_str, ...) __attribute__ ((noreturn, format (printf, 1, 2)));
-static const char TPWL_VERSION [] = "0.3";
+static const char TPWL_VERSION [] = "0.4";
 
 /* By default, we say that bash/readline do NOT work properly with UTF-8.
    In that case we use some horrible bodgery to try to fix this - see
@@ -146,21 +146,26 @@ int load_theme (const char *str)
 static int xctab (int code) { return (code & CTAB_EXPLICIT_INDEX_MASK) ? code & 0xFF : ctab [code & 0xFF]; }
 static void append_fgcolor (char *b, int code) { sprintf (b + strlen (b), "\\e[38;5;%dm", xctab (code)); }
 static void append_bgcolor (char *b, int code) { sprintf (b + strlen (b), "\\e[48;5;%dm", xctab (code)); }
-
 static char             pline [8192];           /* "Big enough" (ahem) to avoid checks  */
 static enum symtype_t   symtyp = SYM_PATCHED;   /* Assume patched fonts available - use --compat otherwise  */
 
-#define MAXSEGS 64
+#define FACE_ITALIC 1
+#define FACE_NORMAL 0
+#define MAXSEGS     64
 struct segment_t {                              /* Individual segment ("chunk") of bash prompt  */
     uint16_t    fgcolor, bgcolor;
     uint16_t    sep_fg;
+    uint8_t     fontface;                       /* FONT_ITALIC for now  */
     char        sep [4];                        /* Must NOT be truncated */
-    char        item [128 - (6 + 4)];           /* Could be truncated  */ 
+    char        item [128 - (6 + 4 + 1)];       /* Could be truncated  */ 
 };
 static struct segs {
     struct segment_t segs [MAXSEGS];
     unsigned nsegs;
 } pwl_segs;                                     /* All Powerline segments  */
+
+//static const char sitm [] = "\x1b[3m", ritm [] = "\x1b[0m";
+static void append_fontface (char *b, unsigned fontface) { sprintf (b + strlen (b), "\\e[%dm", (fontface) ? 3 :0); }
 
 /* Returns the length of the UTF-8 character encoded at STR.
    Only one UTF-8 character beginning at STR is examined.
@@ -264,13 +269,14 @@ static int strcpy_with_utf8_encoding (char *d, const char *s)
 }                                               /* strcpy_with_utf8_encoding ()  */
                                                     
 /* Extended append an item to the PS1 segment list  - explicitly specifies everything!  */
-static void xappend (struct segs *s, const char *item, int fg, int bg, const char *sep, int sep_fg)
+static void xappend (struct segs *s, const char *item, int fg, int bg, const char *sep, int sep_fg, unsigned fontface)
 {
     assert (s->nsegs < MAXSEGS);
     struct segment_t *sp = s->segs + s->nsegs++;
     sp->fgcolor = fg;
     sp->bgcolor = bg;
     sp->sep_fg = sep_fg;
+    sp->fontface = fontface;
 
     assert (strlen (sep) < sizeof (sp->sep));           /* MUST have room to store separators  */
     strcpy (sp->sep, sep);
@@ -280,9 +286,9 @@ static void xappend (struct segs *s, const char *item, int fg, int bg, const cha
 }
 
 /* Append an item to the PS1 segment list - will use default separator  */
-static void append (struct segs *s, const char *item, int fg, int bg)
+static void append (struct segs *s, const char *item, int fg, int bg, unsigned fontface)
 {
-    xappend (s, item, fg, bg, info_symbols [symtyp].sep, bg);
+    xappend (s, item, fg, bg, info_symbols [symtyp].sep, bg, fontface);
 }
 
 /* Prints our various segments into the string which will eventually 
@@ -294,6 +300,7 @@ static char *drawsegs (char *line, const struct segs *s, const char *title, int 
 {
     unsigned ix;
     unsigned last_fg = CI_NONE, last_bg = CI_NONE;  /* Try to optimise  */
+    unsigned last_fontface = FACE_NORMAL;
     int      last_was_escape_p = 0;
     char     colors [256];
 
@@ -307,6 +314,8 @@ static char *drawsegs (char *line, const struct segs *s, const char *title, int 
             append_fgcolor (colors, last_fg = sp->fgcolor);
         if (sp->bgcolor != last_bg)
             append_bgcolor (colors, last_bg = sp->bgcolor);
+        if (sp->fontface != last_fontface)
+            append_fontface (colors, last_fontface = sp->fontface);
 
         /* If we added nonprintable stuff, escape them from bash.
            If last_was_escape_p is true, we overwrite the previously-emitted
@@ -392,13 +401,13 @@ static char *drawsegs (char *line, const struct segs *s, const char *title, int 
     return line;
 }                                                   /* drawsegs ()  */
 
-static void add_host (struct segs *s, const char *host)
+static void add_host (struct segs *s, const char *host, unsigned fontface)
 {
     if (host == NULL || *host == 0)
         host = (spaced_p) ? " \\h " : "\\h";        /* bash hostname  */
-    append (s, host, HOSTNAME_FG, HOSTNAME_BG);
+    append (s, host, HOSTNAME_FG, HOSTNAME_BG, fontface);
 }
-static void add_user (struct segs *s, const char *user)
+static void add_user (struct segs *s, const char *user, unsigned fontface)
 {
     if (user == NULL || *user == 0)
         user = (spaced_p) ? " \\u " : "\\u";        /* bash user  */
@@ -406,7 +415,7 @@ static void add_user (struct segs *s, const char *user)
     const char *env_user = getenv ("USER");         /* Check for root  */
     int root_p = (env_user && strcmp (env_user, "root") == 0);
 
-    append (s, user, USERNAME_FG, (root_p) ? USERNAME_ROOT_BG : USERNAME_BG);
+    append (s, user, USERNAME_FG, (root_p) ? USERNAME_ROOT_BG : USERNAME_BG, fontface);
 }
 
 /* This is a monster.  Sorry.  */
@@ -427,14 +436,14 @@ static void add_user (struct segs *s, const char *user)
    even if individual directories are longer than MAX_DIR_LEN or the number
    of directories exceeds max_depth.  */
 
-static void add_cwd (struct segs *s, const char *cwd, const char *homedir, int max_depth, int max_dir_len, int split_p)
+static void add_cwd (struct segs *s, const char *cwd, const char *homedir, int max_depth, int max_dir_len, int split_p, unsigned fontface)
 {
     if (cwd == NULL || *cwd == 0)
         return;
 
     if (homedir != NULL && homedir [0] != 0 && strncmp (cwd, homedir, strlen (homedir)) == 0)
     {
-        append (s, (spaced_p) ? " ~ " : "~", HOME_FG, HOME_BG);
+        append (s, (spaced_p) ? " ~ " : "~", HOME_FG, HOME_BG, fontface);
         cwd += strlen (homedir);
         if (*cwd == '/') ++cwd;
     }
@@ -559,9 +568,9 @@ static void add_cwd (struct segs *s, const char *cwd, const char *homedir, int m
                     strcat (thisdir, " ");          /* Extra space for split component  */
 
                 if (split_p && ! last_p)
-                    xappend (s, thisdir, fgx, PATH_BG, si->thin, SEPARATOR_FG);
+                    xappend (s, thisdir, fgx, PATH_BG, si->thin, SEPARATOR_FG, fontface);
                 else
-                    xappend (s, thisdir, fgx, PATH_BG, (last_p) ? si->sep : "", PATH_BG);
+                    xappend (s, thisdir, fgx, PATH_BG, (last_p) ? si->sep : "", PATH_BG, fontface);
             }
         }                                           /* for (ndirs)  */
     }                                               /* if (*cwd)  */
@@ -586,6 +595,7 @@ static int usage (int exit_code)
     printf (" --depth=DEPTH          Maximum number of directories to show in path\n"
             "                        (if negative, only last DEPTH directories shown)\n");
     printf (" --dir-size=SIZE        Directory names longer than SIZE will be truncated\n");
+    printf (" --[no-]italic          Do [not] use italic mode.  Also -i/-I\n");
     printf (" --[no-]utf8-ok         Do [not] use workarounds to fixup Bash prompt length\n");
     printf (" --user[=BLAH]          Indicate user in PS1 (explicitly or bash '\\u')\n");
     printf (" --pwd[=PATH]           Indicate working dir in PS1 (implicitly '$PWD')\n");
@@ -635,6 +645,7 @@ int main (int argc, const char *argv [])
     int         fancy_p = 1;                        /* Fancy directory splitting?  */
     int         history_p = 0;                      /* Include bash history cmd number in PS1?  */
     unsigned    u_fg = PATH_BG, u_bg = PATH_FG;     /* Additional string foreground / background colors  */
+    unsigned    fontface = FACE_NORMAL;             /* Italic or plain text  */
     int         ix;
 
     const char  *themestr = getenv ("TPWL_COLORS");
@@ -715,14 +726,20 @@ int main (int argc, const char *argv [])
         {
             if (ssh_p)                                              /* Only done if SSH active  */
             {
-                append (s, info_symbols [symtyp].network, SSH_FG, SSH_BG);
+                append (s, info_symbols [symtyp].network, SSH_FG, SSH_BG, fontface);
                 if (strcmp (arg, "--ssh-all") == 0)
                 {
-                    add_user (s, NULL);
-                    add_host (s, NULL);
+                    add_user (s, NULL, fontface);
+                    add_host (s, NULL, fontface);
                 }
             }
         }
+        else
+        if (strcmp (arg, "-i") == 0 || strcmp (arg, "--italics") == 0 || strcmp (arg, "--italic") == 0)
+            fontface |= FACE_ITALIC;
+        else
+        if (strcmp (arg, "-I") == 0 || strcmp (arg, "--no-italics") == 0 || strcmp (arg, "--no-italic") == 0)
+            fontface &= ~ FACE_ITALIC;
         else
         if (strbegins_p (arg, "--status="))
             bad_status_p = (arg [9] != '0' || arg [10] != 0);   /* Nonzero status of last command  */
@@ -739,27 +756,27 @@ int main (int argc, const char *argv [])
         else
         if (strcmp (arg, "--ssh-host") == 0)
         {
-            if (ssh_p) add_host (s, NULL);          /* If we're SSH-ing, show host  */
+            if (ssh_p) add_host (s, NULL, fontface);    /* If we're SSH-ing, show host  */
         }
         else
         if (strcmp (arg, "--ssh-user") == 0)
         {
-            if (ssh_p) add_user (s, NULL);          /* If we're SSH-ing, show user  */
+            if (ssh_p) add_user (s, NULL, fontface);    /* If we're SSH-ing, show user  */
         }
         else
         if (strbegins_p (arg, "--user"))            /* Can have explicit --user=foo or just --user to use bash \\u  */
-            add_user (s, (arg [6] == '=') ? arg + 7 : NULL);
+            add_user (s, (arg [6] == '=') ? arg + 7 : NULL, fontface);
         else
         if (strbegins_p (arg, "--pwd"))             /* Can have explicit --pwd=path or just --pwd to use HOME env var  */
         {
             add_cwd (s,
                      (arg [5] == '=') ? arg + 6 : getenv ("PWD"),   /* the directory to display  */
                      (homedir) ? homedir : getenv ("HOME"), 
-                     max_depth, max_dir_size, fancy_p);
+                     max_depth, max_dir_size, fancy_p, fontface);
         }
         else
         if (strbegins_p (arg, "--host"))            /* Can have explicit --host=name or just --host to use bash \\h  */
-            add_host (s, (arg [6] == '=') ? arg + 7 : NULL);
+            add_host (s, (arg [6] == '=') ? arg + 7 : NULL, fontface);
         else
         if (strbegins_p (arg, "--title"))           /* Can have additional --title=EXTRA or just --title for default  */
             title_extra = (arg [7] == '=') ? arg + 8 : "";      /* Empty string for default window title  */
@@ -774,12 +791,12 @@ int main (int argc, const char *argv [])
             char buf [512];
             if (spaced_p)
                 snprintf (buf, sizeof (buf), " %s ", arg);
-            append (s, (spaced_p) ? buf : arg, u_fg, u_bg);  /* Add arg as user text with user fg/bg  */
+            append (s, (spaced_p) ? buf : arg, u_fg, u_bg, fontface);  /* Add arg as user text with user fg/bg  */
         }
     }
 
     if (history_p)
-        xappend (s, (spaced_p) ? " \\! " : "\\!", HISTORY_FG, CMD_PASSED_BG, /*no sep*/"", CMD_PASSED_BG);
+        xappend (s, (spaced_p) ? " \\! " : "\\!", HISTORY_FG, CMD_PASSED_BG, /*no sep*/"", CMD_PASSED_BG, fontface);
 
     if (prompt == 0)                                /* Using default prompt  */
     {
@@ -787,9 +804,9 @@ int main (int argc, const char *argv [])
     }
 
     if (bad_status_p)
-        append (s, prompt, CMD_FAILED_FG, CMD_FAILED_BG);
+        append (s, prompt, CMD_FAILED_FG, CMD_FAILED_BG, fontface);
     else
-        append (s, prompt, CMD_PASSED_FG, CMD_PASSED_BG);
+        append (s, prompt, CMD_PASSED_FG, CMD_PASSED_BG, fontface);
 
     printf ("%s", drawsegs (pline, s, title_extra, ssh_p));
     return 0;

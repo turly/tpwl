@@ -70,7 +70,7 @@ PS1="[\\W]\\! \\$ "                 # Simple prompt by default
 
 if [ "$TERM" != "linux" ]; then                         # not Linux console
   if hash tpwl 2>/dev/null; then                        # tpwl binary exists somewhere on PATH
-    TPWL_ARGS="--hist"                                  # --tight --plain
+    TPWL_ARGS="--hist --italic"                         # --tight --plain
     if [ "$CLEARCASE_VIEW" != "" ]; then                # Special update_ps1 for Clearcase view
         function _update_ps1() {
             #branch_str=$'\xee\x82\xa0'                  # Powerline font's BRANCH glyph U+E0A0
@@ -125,7 +125,8 @@ Order is important, e.g. place '--max-depth=N' before '--pwd'
  --depth=DEPTH          Maximum number of directories to show in path
                         (if negative, only last DEPTH directories shown)
  --dir-size=SIZE        Directory names longer than SIZE will be truncated
- --utf8-ok              Do not use workarounds to fixup Bash prompt length
+ --italic/--no-italic   Turn on/off italic mode.  Also -i/-I
+ --[no-]utf8-ok         Do [not] use workarounds to fixup Bash prompt length
  --user[=BLAH]          Indicate user in PS1 (explicitly or bash '\u')
  --pwd[=PATH]           Indicate working dir in PS1 (implicitly '$PWD')
  --host[=NAME]          Indicate hostname in PS1 (explicitly or bash '\h')
@@ -146,5 +147,5 @@ See tpwl project page at https://github.com/turly/tpwl
 
 # License
 
-_tpwl_ is (C) 2016 Turly O'Connor and is MIT Licensed.  See the LICENSE file.
+_tpwl_ is (C) 2016-2018 Turly O'Connor and is MIT Licensed.  See the LICENSE file.
 
