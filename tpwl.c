@@ -36,7 +36,7 @@
 #include <assert.h>
 
 static void fatal (const char *fmt_str, ...) __attribute__ ((noreturn, format (printf, 1, 2)));
-static const char TPWL_VERSION [] = "0.4";
+static const char TPWL_VERSION [] = "0.5";
 
 /* By default, we say that bash/readline do NOT work properly with UTF-8.
    In that case we use some horrible bodgery to try to fix this - see
@@ -53,10 +53,11 @@ struct symbol_info_t {
     const char lock [4], network [4], sep [4], thin [4], ellipsis [4];
     int   ellipsis_width;               /* In character glyphs, not string bytes  */
 };
-enum symtype_t {SYM_ASCII, SYM_PATCHED, SYM_FLAT};
+enum symtype_t {SYM_ASCII, SYM_PATCHED, SYM_PATCHED_NO_SEPS, SYM_FLAT};
 static const struct symbol_info_t info_symbols [] = {
     {"RO", "SSH", ">", ">", "...", 3},                                                      /* ASCII  */
     {"\xEE\x82\xA2", "\xEE\x82\xA2", "\xee\x82\xb0", "\xee\x82\xb1", "\xE2\x80\xA6", 1},    /* Patched Powerline fonts  */
+    {"\xEE\x82\xA2", "\xEE\x82\xA2", "", "", "", 0},                                        /* Patched Powerline fonts, no separators  */
     {"", "", "", "", "", 0}                                                                 /* FLAT  */
 };
 
@@ -584,6 +585,7 @@ static int usage (int exit_code)
     printf ("Order is important, e.g. place '--max-depth=N' before '--pwd'\n\n");
     printf (" --patched|ascii|flat   Use patched Powerline fonts for prompt component\n"
             "                        separators, or ASCII versions, or no separators\n");
+    printf (" --patched-no-seps      Patched Powerline fonts for ssh and root symbols only\n");
     printf (" --theme=COLORSTRING    Change the tpwl color scheme.  COLORSTRING is a colon-\n"
             "                        separated list of xterm color indices.  Env var\n"
             "                        TPWL_COLORS=COLORSTRING also works.  See also...\n");
@@ -648,6 +650,7 @@ int main (int argc, const char *argv [])
     unsigned    fontface = FACE_NORMAL;             /* Italic or plain text  */
     int         ix;
 
+    const char  *no_powerline_fonts = getenv ("NO_POWERLINE_FONTS");
     const char  *themestr = getenv ("TPWL_COLORS");
     if (themestr)
         load_theme (themestr);
@@ -661,6 +664,10 @@ int main (int argc, const char *argv [])
     for (ix = 1; ix < argc; ++ix)                   /* FIXME: Use optargs or something  */
     {
         const char *arg = argv [ix];
+
+        /* Do not allow patched fonts if there was an environment var saying we don't have any  */
+        if (no_powerline_fonts != NULL && (symtyp == SYM_PATCHED || symtyp == SYM_PATCHED_NO_SEPS))
+            symtyp = SYM_FLAT;
 
         //fprintf (stderr, "arg %d is '%s'\n", ix, arg);
         if (strcmp (arg, "--help") == 0 || strcmp (arg, "-h") == 0)
@@ -713,6 +720,8 @@ int main (int argc, const char *argv [])
         if (strcmp (arg, "--plain") == 0) fancy_p = 0;              /* No fancy > Powerline > path > splits  */ 
         else
         if (strcmp (arg, "--patched") == 0) symtyp = SYM_PATCHED;   /* Patched Powerline fonts available  */
+        else
+        if (strcmp (arg, "--patched-no-seps") == 0) symtyp = SYM_PATCHED_NO_SEPS;   /* Patched Powerline fonts, only ssh and root symbols */
         else
         if (strcmp (arg, "--ascii") == 0) symtyp = SYM_ASCII;       /* ">", "..."  */
         else
@@ -799,16 +808,15 @@ int main (int argc, const char *argv [])
         xappend (s, (spaced_p) ? " \\! " : "\\!", HISTORY_FG, CMD_PASSED_BG, /*no sep*/"", CMD_PASSED_BG, fontface);
 
     if (prompt == 0)                                /* Using default prompt  */
-    {
-        prompt = (spaced_p) ? "\\$ " : "\\$";       /* Just $ or # if root  */
-    }
+        prompt = "\\$";                             /* Just $ or # if root  */
 
     if (bad_status_p)
         append (s, prompt, CMD_FAILED_FG, CMD_FAILED_BG, fontface);
     else
         append (s, prompt, CMD_PASSED_FG, CMD_PASSED_BG, fontface);
 
-    printf ("%s", drawsegs (pline, s, title_extra, ssh_p));
+    printf ("%s%s", drawsegs (pline, s, title_extra, ssh_p),
+            (spaced_p || (symtyp == SYM_PATCHED_NO_SEPS || symtyp == SYM_FLAT)) ? " " : "");
     return 0;
 }
 
